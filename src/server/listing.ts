@@ -40,7 +40,9 @@ export function readListingRegex(text: string): ListingClaims {
   }
   const beds = t.match(/(\d+(?:\.\d+)?)\s*(?:bed(?:room)?s?|br|bd)\b/i);
   const baths = t.match(/(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b/i);
-  const sqft = t.match(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)/i);
+  // Living area, not the lot: skip a match with "lot" just before it or right after it.
+  const sqft = [...t.matchAll(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)\.?/gi)]
+    .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^\s*(?:\w+\s+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
   const units = t.match(/\b(\d+|two|three|four|five|six)[- ]units?\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
   let adu: ListingClaims['adu'] = null;
   if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|junior adu|jadu)/i.test(t)) adu = 'legal';

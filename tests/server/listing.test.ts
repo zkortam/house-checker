@@ -86,3 +86,10 @@ describe('price among other dollar amounts', () => {
     expect(readListingRegex('1 Main St, SF. Est. $8,912/mo. $1,349,000').price).toBe(1349000);
   });
 });
+
+describe('living area, not the lot', () => {
+  it('skips lot square footage', () => {
+    expect(readListingRegex('1 Main St, SF. Lot: 2,500 sq ft. Living area 1,200 sq ft.').sqft).toBe(1200);
+    expect(readListingRegex('1 Main St, SF. 2,500 sq ft lot, 1,200 sq ft of living space.').sqft).toBe(1200);
+  });
+});
