@@ -131,6 +131,9 @@ export function buildReport(input: RuleInput): Report {
   const ledger: ClaimRow[] = [];
   const listingUnits = claims.units;
 
+  // "4 bed with legal ADU" and no unit count, on a lot the city counts as two legal units: the in-law is the second unit.
+  const aduIsSecondUnit = listingUnits == null && !!claims.adu && !unitLegalized && (recordUnits ?? rollUnits ?? 1) === 2;
+
   // Units
   if (listingUnits != null || claims.adu) {
     const lu = listingUnits ?? 1;
@@ -144,6 +147,11 @@ export function buildReport(input: RuleInput): Report {
         why: label === 'permitted_not_updated'
           ? `Permit ${lastUnitPermit.permit_number} ${unitLegalized ? 'legalized the ground-floor unit under the ADU program' : `changed the building from ${lastUnitPermit.existing_units?.replace('.0', '')} to ${recordUnits} units`} and closed with a certificate of final completion on ${fmtDate(unitCfc?.date_issued ?? lastUnitPermit.completed_date)} ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}. The assessor's roll is a snapshot from ${fmtDate(lien)}, before that work finished ${c(rollSrc)}.`
           : `Permit ${lastUnitPermit.permit_number} set the building at ${recordUnits} units ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}, and the assessor agrees ${c(rollSrc)}.`,
+      });
+    } else if (aduIsSecondUnit) {
+      ledger.push({
+        key: 'units', title: 'Units', listing: '1 plus in-law', records: '2', label: 'matches',
+        why: `City records count two legal units ${c(rollSrc)}, so the in-law can be the second one.`,
       });
     } else if (adu && !unitLegalized && (listingUnits == null || listingUnits === (recordUnits ?? rollUnits ?? 1))) {
       const base = recordUnits ?? rollUnits ?? 1;
@@ -241,6 +249,12 @@ export function buildReport(input: RuleInput): Report {
         why: label === 'resolved'
           ? `Complaints in ${yrsText} cited an illegal unit${detail} ${c(S.complaint(firstUnitComplaint!))}. The ${year(lastUnitPermit.filed_date)} permit was filed to comply with ${novCount === 2 ? 'both notices' : novCount > 2 ? 'the notices' : 'the notice'} of violation and is complete ${c(S.permit(lastUnitPermit))}.`
           : `Permit ${lastUnitPermit.permit_number} created the unit and is complete ${c(S.permit(lastUnitPermit))}.`,
+      });
+    } else if (aduIsSecondUnit && !liveUnit[0]) {
+      ledger.push({
+        key: 'adu', title: 'In-law', listing: claims.adu === 'legal' ? 'Legal' : /garden/i.test(input.listingText) ? 'Garden in-law' : 'In-law',
+        records: 'Legal 2nd unit', label: 'matches',
+        why: `City records count two legal units ${c(rollSrc)}. Ask which one the listing calls the in-law.`,
       });
     } else {
       const live = liveUnit[0];
