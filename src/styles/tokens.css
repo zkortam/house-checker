@@ -1,0 +1,81 @@
+/* House Checker tokens: research/design-digest.md section 1 (Surf tokens.md, colour-and-effects.md). Light and Dark only.
+   The boot script in app/layout.tsx stamps data-theme before first paint; first visit defaults to dark. Values marked ≈ approximate. */
+:root {
+  color-scheme: light;
+  --font-scale: 1;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text-sm: calc(14px * var(--font-scale)); --lh-sm: 1.4286;
+  --text-body: calc(15px * var(--font-scale)); --lh-body: 1.4667; --ls-body: -0.005em;
+  --text-base: calc(16px * var(--font-scale)); --lh-base: 1.5;
+  --text-lg: calc(18px * var(--font-scale)); --lh-lg: 1.5556; --ls-lg: -0.01em;
+  --text-2xl: calc(24px * var(--font-scale)); --lh-2xl: 1.3333; --ls-2xl: -0.02em;
+  --text-3xl: calc(30px * var(--font-scale)); --lh-3xl: 1.2; --ls-3xl: -0.02em;
+  --text-badge: calc(11px * var(--font-scale));
+  --w-normal: 400; --w-medium: 500; --w-semibold: 600; --w-bold: 700;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+  --card-padding: 16px; --spacing-overlay: 16px;
+  --radius-xs: 8px; --radius-sm: 12px; --radius-md: 16px; --radius-2xl: 28px; --radius-3xl: 32px; --radius-full: 9999px;
+  --blur-header: 12px;
+  --z-sticky: 200; --z-modal: 400; --z-toast: 600; --z-max: 9999;
+  --dur-instant: 75ms; --dur-fast: 150ms; --dur-normal: 200ms; --dur-slow: 300ms; --ovl-dur: 240ms; --exit-ratio: 0.8;
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1); --ease-dialog: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1); --ease-exit: cubic-bezier(0.4, 0, 1, 1); --ease-gentle: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --press: 0.96; --press-subtle: 0.98; --press-opacity: 0.7;
+  --tap: 44px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px; --icon-xl: 24px; --icon-chrome: 26px;
+  --dialog-md: 560px; --header-row: 3.5rem;
+  --reading-column: 560px;
+
+  --ink-rgb: 11 11 18;
+  --canvas: #f4f5f8;
+  --text-primary: rgb(var(--ink-rgb));
+  --text-secondary: rgb(var(--ink-rgb) / 0.66);
+  --text-muted: rgb(var(--ink-rgb) / 0.57);
+  --text-faint: rgb(var(--ink-rgb) / 0.45);
+  --text-inverted: #ffffff;
+  --accent: #2563eb; --on-accent: #ffffff;
+  --cta: rgb(var(--ink-rgb)); --on-cta: #ffffff;
+  --surface-card: #ffffff;           /* ≈ */
+  --surface-overlay: #ffffff;        /* ≈ opaque */
+  --header-glass: rgb(244 245 248 / 0.78); /* ≈ canvas under the one frost */
+  --bg-overlay: rgb(var(--ink-rgb) / 0.06);
+  --glass-border: rgb(var(--ink-rgb) / 0.10);
+  --border-default: rgb(var(--ink-rgb) / 0.14);
+  --shadow-lg: 0 12px 32px rgb(11 11 18 / 0.12);
+  --scrim: rgb(0 0 0 / 0.4);
+  --success: #22c55e; --warning: #f59e0b; --error: #ef4444; --info: #3b82f6;
+  --success-ink: #15803d; --warning-ink: #b45309; --error-ink: #b91c1c; --info-ink: #1d4ed8;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --ink-rgb: 255 255 255; --canvas: #050508;
+  --text-secondary: rgb(var(--ink-rgb) / 0.6); --text-muted: rgb(var(--ink-rgb) / 0.46); --text-faint: rgb(var(--ink-rgb) / 0.35);
+  --text-inverted: #060a1e; --cta: #ffffff; --on-cta: #060a1e;
+  --surface-card: #111217; --surface-overlay: #111217; --header-glass: rgb(5 5 8 / 0.72);
+  --bg-overlay: rgb(var(--ink-rgb) / 0.08); --glass-border: rgb(var(--ink-rgb) / 0.10); --border-default: rgb(var(--ink-rgb) / 0.16);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  --success-ink: #22c55e; --warning-ink: #f59e0b; --error-ink: #ef4444; --info-ink: #3b82f6;
+} }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink-rgb: 255 255 255; --canvas: #050508;
+  --text-secondary: rgb(var(--ink-rgb) / 0.6); --text-muted: rgb(var(--ink-rgb) / 0.46); --text-faint: rgb(var(--ink-rgb) / 0.35);
+  --text-inverted: #060a1e; --cta: #ffffff; --on-cta: #060a1e;
+  --surface-card: #111217; --surface-overlay: #111217; --header-glass: rgb(5 5 8 / 0.72);
+  --bg-overlay: rgb(var(--ink-rgb) / 0.08); --glass-border: rgb(var(--ink-rgb) / 0.10); --border-default: rgb(var(--ink-rgb) / 0.16);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  --success-ink: #22c55e; --warning-ink: #f59e0b; --error-ink: #ef4444; --info-ink: #3b82f6;
+}
+@media (min-width: 640px) { :root { --spacing-overlay: 20px; } }
+@media (min-width: 1280px) { :root { --reading-column: 600px; } }
+@media (min-width: 1440px) { :root { --reading-column: 640px; } }
+:root {
+  --text-xl: calc(20px * var(--font-scale)); --lh-xl: 1.4; --ls-xl: -0.01em;
+  --icon-3xl: 48px; --stagger: 50ms; --dialog-sm: 460px;
+  --z-toast-alert: 601;
+  --duration-reduce-motion: 0.01ms; --dur-spin: 900ms; --dur-undo: 5000ms; --dur-toast-out: 240ms;
+  --thumb: #ffffff; --thumb-shadow: 0 1px 4px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.06);
+  --gutter-x: max(16px, env(safe-area-inset-left, 0px));
+}
+html[data-font-size="small"] { --font-scale: 0.875; }
+html[data-font-size="large"] { --font-scale: 1.125; }
