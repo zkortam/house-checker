@@ -509,7 +509,10 @@ export function buildReport(input: RuleInput): Report {
     unknowns.push({ id: 'u-bedrooms', title: 'How many bedrooms are there now?', why: `Records leave bedrooms blank${bp ? ` and one was turned into an office ${c(S.permit(bp))}` : ''}.`, resolver: 'listing_agent', action: 'email_listing_agent' });
   }
 
-  const bad = ledger.filter((r) => ['open_case', 'no_permit_found'].includes(r.label)).length + cases.filter((x) => x.label === 'open_case').length;
+  // Caution when the records contradict what the listing sells: open cases, missing permits, or a different unit,
+  // bath or in-law count. A size difference alone stays a question for the inspector.
+  const bad = ledger.filter((r) => ['open_case', 'no_permit_found'].includes(r.label) || (r.label === 'records_differ' && ['units', 'baths', 'adu'].includes(r.key))).length
+    + cases.filter((x) => x.label === 'open_case').length;
   const unsafe = novs.some((v) => v.unsafe_building === 'Y' && /^active/i.test(v.status ?? ''));
   const tone: Decision['tone'] = unsafe ? 'stop' : bad ? 'caution' : 'clear';
   const noFoundation = systems.find((s) => s.title === 'Foundation')?.status === 'no_record';
