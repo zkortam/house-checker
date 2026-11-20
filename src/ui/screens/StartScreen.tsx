@@ -7,6 +7,7 @@ import { U } from '../icons';
 import { Button, ChipButton, FileAttach, Group, IconButton, Textarea } from '../components/ui';
 import { uploadPacket } from '../api';
 import { startRun } from '../lib/run-store';
+import { useTabTitle } from '../lib/tab-title';
 import { errorText } from '../lib/errors';
 import { AppShell } from '../components/AppShell';
 import { track } from '../analytics';
@@ -24,8 +25,9 @@ export function StartScreen() {
   const field = useRef<HTMLTextAreaElement>(null);
   const autoRan = useRef(false);
 
+  useTabTitle(fill(S.tabTitle, { page: S.startTitle }));
+
   useEffect(() => {
-    document.title = fill(S.tabTitle, { page: S.startTitle });
     // A submit before hydration arrives as a plain GET with ?listing=; finish what the reader asked for.
     const q = new URLSearchParams(location.search).get('listing');
     if (q && q.trim().length >= 4 && !autoRan.current) {
