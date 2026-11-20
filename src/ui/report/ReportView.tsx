@@ -174,9 +174,9 @@ function Ring({ rows }: { rows: ClaimRow[] }) {
 function ClaimsCard({ rows, onOpen }: { rows: ClaimRow[]; onOpen: (r: ClaimRow) => void }) {
   if (!rows.length) return null;
   return (
-    <div className="b-card span-2 rows-2 claims">
+    <div className="b-card span-2 claims">
       <div className="claims-head"><span className="b-label">{S.compareTitle}</span>
-        <span className="claims-cols" aria-hidden="true"><span>{S.compareListing}</span><span /><span>{S.compareCity}</span></span></div>
+        <span className="cc" aria-hidden="true">{S.compareListing}</span><span aria-hidden="true" /><span className="cc" aria-hidden="true">{S.compareCity}</span></div>
       {rows.map((r) => {
         const l = LABELS[r.label];
         return (
@@ -227,7 +227,7 @@ function TaxCard({ costs, price, setPrice, onHow }: { costs: Costs; price: numbe
       <div className="tax-minis">
         {supp ? <span><b className="num">{money(supp.amount)}</b>{S.supplementalShort}</span> : null}
         {transfer ? <span><b className="num">{money(transfer.amount)}</b>{S.transferShort}</span> : null}
-        {fees ? <span className="tone-error"><b className="num ink">{money(fees.amount)}{S.perMonth}</b>{S.caseFeesShort}</span> : null}
+        {fees ? <span className="tone-error"><b className="num ink">{money(fees.amount)} {S.perMonth}</b>{S.caseFeesShort}</span> : null}
       </div>
       <button type="button" className="b-link" onClick={onHow}>{S.howWorkedOut}<U name="caret" className="rot" /></button>
     </div>
@@ -351,7 +351,7 @@ function BonesCard({ rows, built, onOpen }: { rows: SystemRow[]; built: number |
           );
         })}
       </div>
-      <div className="axis num" aria-hidden="true"><span>{from}</span><span>{now}</span></div>
+      <div className="bone bone-axis" aria-hidden="true"><span /><span className="axis num"><span>{from}</span><span>{now}</span></span><span /></div>
     </div>
   );
 }

@@ -70,7 +70,7 @@ export function CheckScreen({ id }: { id: string }) {
   return (
     <AppShell back title={address ?? undefined} share={!!report}>
       <SourceProvider value={openSource}>
-        <section className="column" aria-labelledby="reportTitle">
+        <section className={`column${report ? ' wide' : ''}`} aria-labelledby="reportTitle">
           {report ? null : <div className="answer-head">
             <h1 id="reportTitle">{address ?? (fetchError ? S.appName : S.stepsTitle)}</h1>
           </div>}
