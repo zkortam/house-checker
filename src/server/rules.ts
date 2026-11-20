@@ -236,11 +236,17 @@ export function buildReport(input: RuleInput): Report {
       });
     } else {
       const live = liveUnit[0];
+      const closedUnitCase = planning.filter((p) => /ENF/.test(p.record_type ?? p.record_id ?? '') && /^closed/i.test(p.record_status ?? '') && /short-term|unpermitted dwell|udu|illegal unit|unauthori[sz]ed unit/i.test(p.description ?? ''))
+        .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''))[0];
+      const caseYear = closedUnitCase ? year(closedUnitCase.close_date ?? closedUnitCase.open_date) : null;
+      const caseNote = closedUnitCase && P
+        ? ` Planning closed a case about ${/short-term/i.test(closedUnitCase.description ?? '') ? 'short-term rentals and a possible unpermitted unit' : 'an unpermitted unit'}${caseYear ? ` in ${caseYear}` : ''} ${c(S.planningParcel(P, caseYear ? String(caseYear) : null))}.`
+        : '';
       ledger.push({
         key: 'adu', title: 'In-law', listing: claims.adu === 'legal' ? 'Legal' : /garden/i.test(input.listingText) ? 'Garden in-law' : 'In-law',
         records: live ? 'Not finaled' : 'None', label: live ? 'permitted_not_finaled' : 'no_permit_found',
         why: live ? `Permit ${live.permit_number} would add the unit and is not signed off ${c(S.permit(live))}.`
-          : `No permit creates a second unit${mainPermit ? ` ${c(S.permit(mainPermit))}` : ''}.${firstUnitComplaint ? ` A ${year(firstUnitComplaint.date_filed)} complaint described an unpermitted unit ${c(S.complaint(firstUnitComplaint))}.` : ''} Ask whether anyone lives there.`,
+          : `No permit creates a second unit${mainPermit ? ` ${c(S.permit(mainPermit))}` : ''}.${caseNote}${firstUnitComplaint ? ` A ${year(firstUnitComplaint.date_filed)} complaint described an unpermitted unit ${c(S.complaint(firstUnitComplaint))}.` : ''} Ask whether anyone lives there.`,
       });
     }
   }

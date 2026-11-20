@@ -71,6 +71,10 @@ export const S = {
     url: /ENF|PIC/.test(r.record_id ?? '') ? `https://sfplanninggis.org/pim?search=${r.record_id}` : `${R}qvu5-m3a2.json?record_id=${r.record_id}`,
     dataset: /ENF|PIC/.test(r.record_id ?? '') ? 'y673-d69b' : 'qvu5-m3a2',
   }),
+  planningParcel: (p: { parcel: string; block: string; lot: string }, year: string | null): Source => ({
+    id: `planning:${p.parcel}`, title: `Planning records, block ${p.block} lot ${p.lot}`, publisher: 'SF Planning', date: year,
+    url: `${R}y673-d69b.json?block=${p.block}&lot=${p.lot}`, dataset: 'y673-d69b',
+  }),
   hazards: (parcel: string): Source => ({
     id: `hazards:${parcel}`, title: 'FEMA flood map, state seismic hazard and tsunami zones', publisher: 'FEMA, California Geological Survey', date: '2021',
     url: 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28',

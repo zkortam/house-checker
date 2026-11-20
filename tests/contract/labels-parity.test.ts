@@ -25,10 +25,11 @@ describe('labels parity, 2055 42nd Ave', () => {
 });
 
 describe('labels parity, 57 Carmelita St', () => {
-  it('same ledger labels and case labels as the fixture', async () => {
+  it('same ledger labels, case labels and source ids as the fixture', async () => {
     const { report } = await run(report57.listing.text);
     expect(ledger(report!)).toEqual(ledger(report57));
     expect(cases(report!)).toEqual(cases(report57));
+    expect(ids(report!)).toEqual(ids(report57));
     expect(report!.decision.tone).toBe(report57.decision.tone);
     expect(report!.unknowns.find((u) => u.action === 'book_specialist')?.specialist).toBe('structural engineer');
   });
