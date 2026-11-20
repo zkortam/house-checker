@@ -70,3 +70,12 @@ describe('street spellings', () => {
     expect(parseAddress('213 06th Ave, San Francisco')?.display).toBe('213 6th Ave');
   });
 });
+
+describe('streets without a type', () => {
+  it('reads Broadway, Avenue B and Avenue of the Palms before ", San Francisco", never "2 bath, San Francisco"', () => {
+    expect(parseAddress('1000 Broadway #503, San Francisco')).toMatchObject({ street: 'BROADWAY', type: null, unit: '503' });
+    expect(parseAddress('901 Avenue B, San Francisco')).toMatchObject({ street: 'AVENUE B', type: null });
+    expect(parseAddress('336 Avenue of the Palms, SF')?.display).toBe('336 Avenue of the Palms');
+    expect(parseAddress('3 bed 2 bath, San Francisco')).toBeNull();
+  });
+});

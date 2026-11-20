@@ -280,7 +280,12 @@ export function buildReport(input: RuleInput): Report {
     const nov = novs.find((v) => v.complaint_number === a.complaint_number);
     const d = lower(a.complaint_description);
     const title = /over[- ]?excavat/.test(d) ? 'Over-excavation at the rear' : /shoring|excavat/.test(d) ? 'Excavation before a shoring permit'
-      : /without (a )?permit|no permit/.test(d) || nov?.work_without_permit === 'Y' ? 'Work without a permit' : cap(shortWhat(a.complaint_description, 'Open complaint'));
+      : /without (a )?permit|no permit/.test(d) || nov?.work_without_permit === 'Y' ? 'Work without a permit' : (() => {
+          const w = shortWhat(a.complaint_description, '');
+          const about: Record<string, string> = { reroof: 'roofing work', baths: 'bathroom work', kitchen: 'kitchen work', remodel: 'a remodel', ADU: 'an ADU', 'ADU legalization': 'an ADU',
+            foundation: 'foundation work', 'illegal unit': 'an illegal unit', demolition: 'demolition', 'sewer lateral': 'the sewer lateral', excavation: 'excavation', 'bedroom to office': 'a room conversion' };
+          return about[w] ? `Complaint about ${about[w]}` : 'Open complaint';
+        })();
     const flags = [nov?.work_without_permit === 'Y' ? 'work without a permit' : '', nov?.additional_work_beyond_permit === 'Y' ? 'work beyond the permit' : ''].filter(Boolean);
     cases.push({
       glyph: 'violation', title, label: 'open_case',
@@ -590,7 +595,11 @@ export function buildReport(input: RuleInput): Report {
     const groups = new Map<string, CaseRow[]>();
     for (const x of open) { const t = topic(x); if (t) groups.set(t, [...(groups.get(t) ?? []), x]); }
     const grouped = new Set<CaseRow>();
-    for (const [t, xs] of groups) if (xs.length >= 2) { xs.forEach((x) => grouped.add(x)); watch.push(`${cap(word(xs.length))} active complaints about ${t} ${xs.map((x) => ref1(x.text)).join('')}`.trim()); }
+    for (const [t, xs] of groups) if (xs.length >= 2) { xs.forEach((x) => grouped.add(x)); watch.push(`${cap(word(xs.length))} active complaints about ${t} ${xs.slice(0, 3).map((x) => ref1(x.text)).join('')}`.trim()); }
+    // The rest with the same title ("Open complaint" five times) also read as one line.
+    const byTitle = new Map<string, CaseRow[]>();
+    for (const x of open) if (!grouped.has(x)) byTitle.set(x.title, [...(byTitle.get(x.title) ?? []), x]);
+    for (const [title, xs] of byTitle) if (xs.length >= 2) { xs.forEach((x) => grouped.add(x)); watch.push(`${cap(word(xs.length))} ${lower(title).replace(/complaint$/, 'complaints')} ${xs.slice(0, 3).map((x) => ref1(x.text)).join('')}`.trim()); }
     for (const x of cases) if (!grouped.has(x)) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${ref1(x.text)}`.trim() : `${x.title} ${ref1(x.text)}`.trim());
   }
   if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden in-law' : 'in-law unit'} ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
