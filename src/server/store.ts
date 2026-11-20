@@ -1,8 +1,28 @@
 import { mkdir, readFile, writeFile, rename, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { get as blobGet, put as blobPut } from '@vercel/blob';
 import type { ActionLogEntry, Report } from '../contract/types';
 
-/** Reports and small state as JSON files under .data/ (gitignored). */
+/**
+ * Reports and small state as JSON files under .data/ (gitignored).
+ * On Vercel (BLOB_READ_WRITE_TOKEN set) reports are also kept in a private Vercel Blob store, so every
+ * serverless instance sees the same report and action log; local files stay the fallback.
+ */
+const blobOn = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+const blobPath = (id: string) => `reports/${safe(id)}.json`;
+async function blobRead(id: string): Promise<Report | null> {
+  try {
+    const r = await blobGet(blobPath(id), { access: 'private', useCache: false });
+    if (!r || r.statusCode !== 200) return null;
+    return JSON.parse(await new Response(r.stream).text()) as Report;
+  } catch { return null; }
+}
+async function blobWrite(report: Report): Promise<void> {
+  await blobPut(blobPath(report.id), JSON.stringify(report), {
+    access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json', cacheControlMaxAge: 60,
+  });
+}
+
 export function dataDir(): string { return process.env.HC_DATA_DIR ?? path.join(process.cwd(), '.data'); }
 
 const safe = (id: string) => id.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -20,9 +40,11 @@ export async function readJson<T>(file: string): Promise<T | null> {
 
 export async function saveReport(report: Report): Promise<void> {
   await writeAtomic(path.join(dataDir(), 'reports', safe(report.id) + '.json'), JSON.stringify(report, null, 1));
+  if (blobOn()) { try { await blobWrite(report); } catch (e) { console.error('blob write failed', report.id, e); } }
 }
 
 export async function getReport(id: string): Promise<Report | null> {
+  if (blobOn()) { const r = await blobRead(id); if (r) return r; }
   return readJson<Report>(path.join(dataDir(), 'reports', safe(id) + '.json'));
 }
 
