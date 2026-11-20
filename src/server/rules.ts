@@ -86,8 +86,9 @@ export function buildReport(input: RuleInput): Report {
   const yearBuilt = n(roll?.year_property_built) || null;
   const lotSqft = n(roll?.lot_area) || null;
   const rollUnits = n(roll?.number_of_units);
-  const rollBaths = n(roll?.number_of_bathrooms);
-  const rollBeds = n(roll?.number_of_bedrooms);
+  // The roll writes 0 when it has no count: "0 baths" on a home means not recorded, not none.
+  const rollBaths = n(roll?.number_of_bathrooms) || null;
+  const rollBeds = n(roll?.number_of_bedrooms) || null;
   const rollArea = n(roll?.property_area) || null;
 
   const permits = [...(raw.permits ?? [])].sort((a, b) => (b.filed_date ?? '').localeCompare(a.filed_date ?? ''));
@@ -173,6 +174,8 @@ export function buildReport(input: RuleInput): Report {
           : label === 'no_permit_found' ? `No permit adds a unit beyond the ${recordUnits} on record ${c(rollSrc)}.${firstUnitComplaint ? ` A ${year(firstUnitComplaint.date_filed)} complaint described an illegal unit ${c(S.complaint(firstUnitComplaint))}.` : ''}`
           : `The listing says ${lu}, records show ${recordUnits} ${c(rollSrc)}.`,
       });
+    } else if (listingUnits != null) {
+      ledger.push({ key: 'units', title: 'Units', listing: String(lu), records: null, label: 'not_settled', why: 'No city record gives the unit count. Ask the seller for the 3R report, which shows the legal use.' });
     }
   }
 
@@ -548,7 +551,8 @@ export function buildReport(input: RuleInput): Report {
   // Caution when the records contradict what the listing sells: open cases, missing permits, or a different unit,
   // bath or in-law count. A size difference alone stays a question for the inspector.
   const bad = ledger.filter((r) => ['open_case', 'no_permit_found'].includes(r.label) || (r.label === 'records_differ' && ['units', 'baths', 'adu'].includes(r.key))).length
-    + cases.filter((x) => x.label === 'open_case').length;
+    + cases.filter((x) => x.label === 'open_case').length
+    + (!multiParcel && unitsNow <= 0 && (listingUnits ?? 0) >= 1 ? 1 : 0); // sold as a home, no housing unit on record
   const unsafe = novs.some((v) => v.unsafe_building === 'Y' && /^active/i.test(v.status ?? ''));
   // A clean result is only a clean result when the core records were read: no "Looks solid" without permits or complaints.
   const unread = (['permits', 'complaints'] as const).filter((k) => failed.has(k));
