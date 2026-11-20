@@ -398,7 +398,7 @@ export function buildReport(input: RuleInput): Report {
   } else if (unitsNow >= 2) {
     tenants.push({ glyph: 'tenants', title: 'Rent control', text: `${cap(word(unitsNow))} units${yearBuilt ? ` in a building from ${yearBuilt}` : ''}. Eviction protections can still apply. Confirm with the Rent Board.` });
   } else {
-    tenants.push({ glyph: 'tenants', title: 'Rent control', text: 'One legal unit. A rented in-law unit, permitted or not, can bring eviction protections with it. Confirm with the Rent Board.' });
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `One legal unit. A rented ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden' : 'in-law'} unit, permitted or not, can bring eviction protections with it. Confirm with the Rent Board.` });
   }
   if (firstUnitComplaint && unitsNow >= 2) {
     tenants.push({ glyph: 'complaint', title: 'Tenants now', text: `Not in public records. The ${year(firstUnitComplaint.date_filed)} complaint described a renter in the ${/garage/.test(complaintText(firstUnitComplaint)) ? 'garage ' : ''}unit ${c(S.complaint(firstUnitComplaint))}. Ask whether either unit is occupied.` });
@@ -416,7 +416,7 @@ export function buildReport(input: RuleInput): Report {
     upside.push({ glyph: 'zoning', title: `Zoning ${zoning}`, text: desc });
   }
   const sb9 = !!zoning && /^RH-1/.test(zoning) && lotSqft != null && lotSqft >= 2400 && !historic;
-  if (lotSqft) {
+  if (lotSqft && (!zoning || /^RH-1/.test(zoning))) { // SB 9 only applies in one-family districts
     upside.push({ glyph: 'grow', title: `Lot ${int(lotSqft)} sq ft`,
       text: sb9 ? `Above the 2,400 sq ft minimum for an SB 9 lot split. SB 9 is off the table if a unit was rented in the last 3 years ${c(rollSrc)}.`
         : lotSqft >= 2400 ? `Large enough for an SB 9 split only in a one-family district ${c(rollSrc)}.` : `Below the 2,400 sq ft minimum for an SB 9 lot split ${c(rollSrc)}.` });
@@ -500,7 +500,7 @@ export function buildReport(input: RuleInput): Report {
   if (active.length) unknowns.push({ id: 'u-close-cases', title: 'Will the complaints and permits close before you do?', why: `An open case passes to the next owner, and so do its fees ${c(S.dbiFees())}.`, resolver: 'listing_agent', action: 'email_listing_agent' });
   if (openPlan) unknowns.push({ id: 'u-planning-case', title: 'Is the Planning case closed?', why: `Case ${openPlan.record_id} still reads "${lower(openPlan.record_status)}". A clean close-out protects resale ${c(S.planning(openPlan))}.`, resolver: 'city', action: 'email_city' });
   const aduRow = ledger.find((r) => r.key === 'adu');
-  if (aduRow && aduRow.label === 'no_permit_found') unknowns.push({ id: 'u-garden-unit', title: 'What is the in-law, legally?', why: aduRow.why.split('. ').slice(0, 1).join('') + '.', resolver: 'listing_agent', action: 'email_listing_agent' });
+  if (aduRow && aduRow.label === 'no_permit_found') unknowns.push({ id: 'u-garden-unit', title: `What is the ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden in-law' : 'in-law'}, legally?`, why: aduRow.why.split('. ').slice(0, 1).join('') + '. Ask whether anyone lives there.', resolver: 'listing_agent', action: 'email_listing_agent' });
   if (unitsNow >= 2) unknowns.push({ id: 'u-tenants', title: multiParcel ? 'Is the unit rented?' : unitsNow === 2 ? 'Is either unit rented?' : 'Are any units rented?', why: 'A tenant changes when you can move in and what you can charge.', resolver: 'listing_agent', action: 'email_listing_agent' });
   if (hotel.length) unknowns.push({ id: 'u-short-term', title: 'Are short-term rentals booked?', why: `A hotel-tax registration has been active since ${year(hotelStart)} ${c(hotelSrc)}. Bookings past closing become your problem.`, resolver: 'listing_agent', action: 'email_listing_agent' });
   const bedsRow = ledger.find((r) => r.key === 'beds');
@@ -569,11 +569,32 @@ export function buildReport(input: RuleInput): Report {
   if (bathsRow && ['permitted_not_updated', 'matches'].includes(bathsRow.label) && finaledBaths.length) good.push(`${cap(word(Number(bathsRow.records)))} baths have plumbing finals ${c(...finaledBaths.map((x) => S.plumbing(x.p)))}`);
   const roofSys = systems.find((s) => s.title === 'Roof');
   if (roofSys?.status === 'updated' && roofSys.year && roofSys.year >= input.now.getUTCFullYear() - 5) good.push(`New roof in ${roofSys.year} ${roofSys.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  {
+    // Work in progress that is permitted is good news: "Plumbing, wiring and foundation work all have permits".
+    const live = systems.filter((x) => x.status === 'in_progress' && ['Plumbing', 'Wiring', 'Foundation'].includes(x.title) && /\[\d+\]/.test(x.text));
+    if (live.length >= 2) {
+      const names = live.map((x) => lower(x.title));
+      const refs = [...new Set(live.map((x) => x.text.match(/\[\d+\]/)![0]))].join('');
+      good.push(`${cap(names.length > 2 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names.join(' and '))} work ${names.length > 2 ? 'all have' : 'both have'} permits ${refs}`);
+    }
+  }
   if (hz?.femaZone && !/^(A|V)/.test(hz.femaZone)) good.push(`Outside FEMA flood zones ${c(S.hazards(pid))}`);
   if (!cases.length && !failed.has('complaints')) good.push('No open complaints or city cases');
   if (!buyouts.length && !failed.has('tenants')) good.push(`No tenant buyouts on file ${c(S.noBuyout(pid))}`.replace(` ${c(S.noBuyout(pid))}`, cites.has(`buyout:${pid}`) ? ` ${c(S.noBuyout(pid))}` : ''));
-  for (const x of cases) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${x.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `${x.title} ${x.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
-  if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the in-law unit ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  if (roofSys?.status === 'updated' && roofSys.year && roofSys.year < input.now.getUTCFullYear() - 5) good.push(`Roof replaced in ${roofSys.year} ${roofSys.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  {
+    // Several open complaints about the same thing read as one line: "Two active complaints about excavation [3][4]".
+    const ref1 = (t: string) => t.match(/\[\d+\]/)?.[0] ?? '';
+    const open = cases.filter((x) => x.label === 'open_case');
+    const topic = (x: CaseRow) => /excavat/i.test(`${x.title} ${x.text}`) ? 'excavation' : shortWhat(`${x.title} ${x.text}`, '');
+    const groups = new Map<string, CaseRow[]>();
+    for (const x of open) { const t = topic(x); if (t) groups.set(t, [...(groups.get(t) ?? []), x]); }
+    const grouped = new Set<CaseRow>();
+    for (const [t, xs] of groups) if (xs.length >= 2) { xs.forEach((x) => grouped.add(x)); watch.push(`${cap(word(xs.length))} active complaints about ${t} ${xs.map((x) => ref1(x.text)).join('')}`.trim()); }
+    for (const x of cases) if (!grouped.has(x)) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${ref1(x.text)}`.trim() : `${x.title} ${ref1(x.text)}`.trim());
+  }
+  if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden in-law' : 'in-law unit'} ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  if (caseFee) watch.push(`Open complaints cost ${money(caseFee)} a month in fees ${c(S.dbiFees())}`);
   for (const r of ledger.filter((r) => r.label === 'permitted_not_finaled')) watch.push(`${r.title} permitted, not signed off ${r.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   for (const b of buyouts.slice(0, 1)) {
     const amt = n(b.buyout_amount); const t = n(b.number_of_tenants);
@@ -589,6 +610,7 @@ export function buildReport(input: RuleInput): Report {
     watch.push(/demolition/i.test(first) ? `A demolition and new ${first.match(/(\d+)-unit/)?.[1] ?? ''}-unit building planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.replace('new -unit', 'new') : `${nearby[0].title}: project planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   }
   const clip = (s: string) => (s.length <= 90 ? s : s.slice(0, 87).replace(/\s+\S*$/, '') + '...');
+  if (unknowns.some((u) => u.specialist === 'structural engineer')) for (const h of hazards) h.text = h.text.replace('Worth raising with a structural engineer', 'Worth raising with the structural engineer');
   const highlights = { good: good.slice(0, 5).map(clip), watch: watch.slice(0, 5).map(clip) };
   // The contract wants 2 to 5 good-news lines; plain, cited facts fill the gap.
   const fillers = [
