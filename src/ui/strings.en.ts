@@ -221,12 +221,13 @@ export const S = {
 
   // Specialist request
   bookTitle: 'Request a visit',
-  bookTimes: 'Times',
+  bookTimes: 'Times, Pacific time',
+  bookTimesNote: 'Times are Pacific, where the house is.',
   bookLoadingSlots: 'Finding open times',
   bookNoSlots: 'No open times this week',
   bookSlotsFailed: "Couldn't load open times",
   bookPickSlot: 'Choose a time',
-  bookConfirmTitle: 'Send a request to {who} for {when}?',
+  bookConfirmTitle: 'Send a request to {who} for {when} Pacific time?',
   bookConfirmScope: 'Covers: {value}',
   bookConfirmPrice: 'About {value}',
   bookConfirmPriceUnknown: 'Price set by the specialist',

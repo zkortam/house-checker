@@ -533,7 +533,7 @@ button.b-card:active { transform: scale(var(--press-subtle)); transition-duratio
 .claim { padding: 13px 12px; margin-inline: -12px; border-radius: 16px; border: 0; background: none; font: inherit; color: inherit; text-align: start; }
 @media (hover: hover) and (pointer: fine) { .claim:hover, .bone:hover { background: var(--bg-overlay); } }
 .claim + .claim { box-shadow: 0 -1px 0 var(--bg-overlay); }
-.claim-t { color: var(--text-muted); }
+.claim-t { color: var(--text-secondary); }
 .claim-v { font-size: calc(18px * var(--font-scale)); font-weight: 600; letter-spacing: -0.02em; text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
 .claim-v.none { font-size: var(--text-sm); font-weight: 400; color: var(--text-secondary); letter-spacing: 0; }
 .claim-ic { display: grid; place-items: center; color: var(--text-faint); }
@@ -730,7 +730,7 @@ body:has(.page) { background: radial-gradient(circle at 50% 22%, var(--glow), tr
 .aerial { position: relative; margin: 0 0 var(--sp-6); height: clamp(180px, 26vw, 300px); border-radius: 28px; overflow: hidden; background: var(--surface-card); }
 .aerial img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity var(--dur-slow) var(--ease-gentle); }
 .aerial.on img { opacity: 1; }
-.aerial-pin { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%);
+.aerial-pin { position: absolute; inset-inline-start: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%);
   box-shadow: 0 0 0 5px rgb(255 255 255 / 0.35), 0 2px 10px rgb(0 0 0 / 0.5); opacity: 0; transition: opacity var(--dur-slow); }
 .aerial.on .aerial-pin { opacity: 1; }
 .aerial figcaption { position: absolute; inset-inline-end: 12px; bottom: 10px; font-size: calc(11px * var(--font-scale)); color: rgb(255 255 255 / 0.85); text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); }
@@ -738,4 +738,10 @@ body:has(.page) { background: radial-gradient(circle at 50% 22%, var(--glow), tr
 .page.start .page-title, .page .page-title { font-size: calc(28px * var(--font-scale)); line-height: 1.15; letter-spacing: -0.025em; font-weight: 650; text-align: start; }
 .aerial { margin-top: var(--sp-6); }
 
-.prompt-under .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); color: var(--text-secondary); font-size: 14px; }
+.prompt-under .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); color: var(--text-secondary); font-size: var(--text-sm); }
+/* Raised surfaces (sheets, dialogs) sit lighter than the canvas; muted text there needs the secondary ink for 4.5:1. */
+dialog { --text-muted: var(--text-secondary); }
+html.reduce-motion button.b-card, html.reduce-motion .pill { transition-duration: var(--duration-reduce-motion) !important; }
+html.reduce-motion button.b-card:active, html.reduce-motion .pill:active { transform: none; }
+/* The caption stays readable before the aerial image loads (white card) and over bright imagery. */
+.aerial figcaption { background: color-mix(in srgb, black 68%, transparent); color: white; padding: 2px var(--sp-2); border-radius: var(--radius-full); text-shadow: none; }
