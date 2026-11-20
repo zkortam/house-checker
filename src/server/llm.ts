@@ -12,10 +12,15 @@ const MAX_CONCURRENT = 3;
 let active = 0;
 const queue: Array<() => void> = [];
 
-async function acquire(): Promise<void> {
-  if (active < MAX_CONCURRENT) { active++; return; }
-  await new Promise<void>((resolve) => queue.push(resolve));
-  active++;
+/** A slot for one CLI call. `first` jumps the queue (the writer is on the user's critical path); gives up after maxWaitMs. */
+async function acquire(first = false, maxWaitMs = Infinity): Promise<boolean> {
+  if (active < MAX_CONCURRENT) { active++; return true; }
+  return new Promise<boolean>((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const take = () => { if (timer) clearTimeout(timer); active++; resolve(true); };
+    if (first) queue.unshift(take); else queue.push(take);
+    if (Number.isFinite(maxWaitMs)) timer = setTimeout(() => { const i = queue.indexOf(take); if (i >= 0) queue.splice(i, 1); resolve(false); }, maxWaitMs);
+  });
 }
 function release(): void { active--; const next = queue.shift(); if (next) next(); }
 
@@ -23,7 +28,7 @@ export function llmEnabled(): boolean {
   return (process.env.HC_LLM ?? 'on') !== 'off' && process.env.NODE_ENV !== 'test' && !process.env.VITEST;
 }
 
-export interface LlmOpts { timeoutMs?: number; retries?: number; system?: string }
+export interface LlmOpts { timeoutMs?: number; retries?: number; system?: string; first?: boolean; maxWaitMs?: number }
 
 function runOnce(schema: object, prompt: string, timeoutMs: number, system?: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -58,7 +63,7 @@ export async function llmJson<T>(schema: object, prompt: string, fallback: () =>
   if (!llmEnabled()) return { value: fallback(), source: 'fallback' };
   const tries = 1 + (opts.retries ?? 1);
   for (let i = 0; i < tries; i++) {
-    await acquire();
+    if (!(await acquire(opts.first, opts.maxWaitMs))) break; // no slot in time: the fallback keeps the run moving
     try {
       const v = (await runOnce(schema, prompt, opts.timeoutMs ?? 90_000, opts.system)) as T;
       if (!opts.validate || opts.validate(v)) return { value: v, source: 'model' };
