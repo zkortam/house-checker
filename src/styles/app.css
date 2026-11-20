@@ -387,8 +387,9 @@ ol.tl { list-style: none; margin: 0; }
 .src-row { align-items: flex-start; }
 .src-n { width: var(--icon-lg); flex: none; text-align: center; font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); }
 .cite { appearance: none; border: 0; font: inherit; vertical-align: baseline; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; margin-inline: 3px 0; border-radius: var(--radius-full); background: var(--bg-overlay); color: var(--text-secondary); font-size: var(--text-badge); font-weight: var(--w-semibold); font-variant-numeric: tabular-nums; position: relative; top: -1px; }
-.cite + .cite { margin-inline-start: 2px; }
-.cite::after { content: ""; position: absolute; inset: -12px -4px; }
+.cite + .cite { margin-inline-start: 4px; }
+/* 24x24 hit area (WCAG 2.5.8) that never reaches a chip on the next line or the one beside it. */
+.cite::after { content: ""; position: absolute; inset: -2px -2px; }
 
 /* steps */
 .step-end { display: flex; align-items: center; gap: var(--sp-2); }
@@ -458,3 +459,4 @@ dialog.ovl.sm { }
 .pk-page { font-size: var(--text-sm); color: var(--text-secondary); }
 .pk-v { font-size: var(--text-body); line-height: var(--lh-body); font-weight: var(--w-medium); }
 .cmp-row[aria-expanded="true"] .more { color: var(--text-secondary); }
+html { scroll-padding-top: calc(var(--header-row) + 8px); scroll-padding-bottom: 8px; }
