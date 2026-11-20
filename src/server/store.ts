@@ -106,9 +106,7 @@ const inflight: Inflight = (g.__hcInflight ??= new Map());
 export function trackRun(id: string, p: Promise<Report | null>): void {
   inflight.set(id, p);
   // On Vercel a refresh can land on another instance: a small marker in Blob says this run is still going.
-  if (blobOn()) void blobPut(`runs/${safe(id)}.json`, JSON.stringify({ id, at: new Date().toISOString() }), {
-    access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json',
-  }).catch(() => undefined);
+  if (blobOn()) void blobPutJson(`runs/${safe(id)}.json`, { id, at: new Date().toISOString() }).catch(() => undefined);
   p.finally(() => { if (inflight.get(id) === p) inflight.delete(id); }).catch(() => undefined);
 }
 
@@ -120,9 +118,7 @@ export async function getReportOrWait(id: string, waitMs = 90_000): Promise<Repo
   if (!run) {
     if (!blobOn()) return null;
     // Another instance may be running it: wait for the report while its marker exists (at most waitMs).
-    let marker = false;
-    try { const m = await blobGet(`runs/${safe(id)}.json`, { access: 'private', useCache: false }); marker = !!m && m.statusCode === 200; } catch { /* no marker */ }
-    if (!marker) return null;
+    if (!(await blobGetJson(`runs/${safe(id)}.json`))) return null;
     for (const end = Date.now() + waitMs; Date.now() < end;) {
       await new Promise((r) => setTimeout(r, 1500));
       const r = await getReport(id);
