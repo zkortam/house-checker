@@ -43,3 +43,14 @@ The Next.js app is scaffolded at milestone M0 (see `plans/CONTRACT.md` §5).
 House Checker compares a listing's claims with public City records and flags differences for you and your agent
 to investigate. It is not an inspection, appraisal or legal advice. Records can be incomplete, and unpermitted
 work may not appear in any record.
+
+## Run (M0 scaffold)
+
+```
+npm install
+cp .env.example .env.local   # all values optional; see the file
+npm run dev                  # http://localhost:3000
+npm run typecheck && npm test && npm run build
+```
+
+Branches: `plan-a` (data, agent, actions) and `plan-b` (interface) merge into `main`. See plans/CONTRACT.md.

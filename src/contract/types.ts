@@ -31,7 +31,7 @@ export type Tone = 'success' | 'info' | 'warning' | 'error' | 'neutral';
 export type Glyph =
   | 'parcel' | 'roll' | 'permit' | 'plumbing' | 'electrical' | 'complaint' | 'violation' | 'planning'
   | 'hazard' | 'money' | 'tenants' | 'zoning' | 'grow' | 'nearby' | 'roof' | 'foundation' | 'unknown'
-  | 'resolved' | 'warning' | 'packet';
+  | 'resolved' | 'warning' | 'packet' | 'reservoir' | 'landslide' | 'flood';
 
 /* ---------- Text with citations ---------- */
 
@@ -55,7 +55,7 @@ export interface Source {
 /* ---------- Report sections ---------- */
 
 export type SectionKey =
-  | 'ledger' | 'cases' | 'costs' | 'bones' | 'tenants' | 'upside' | 'around' | 'history' | 'unknowns' | 'packet';
+  | 'ledger' | 'cases' | 'costs' | 'systems' | 'tenants' | 'upside' | 'hazards' | 'nearby' | 'history' | 'unknowns' | 'packet';
 
 /** Every section is in exactly one state. An error is never rendered as empty. */
 export type SectionState =
@@ -66,8 +66,8 @@ export type SectionState =
 export interface ClaimRow {
   key: 'units' | 'baths' | 'beds' | 'sqft' | 'adu' | 'renovation' | 'other';
   title: string;            // "Units"
-  listing: string | null;   // what the listing says, as written; null = listing silent
-  records: string | null;   // what the records say, short; null renders as the empty glyph
+  listing: string | null;   // what the listing says, short (at most 14 characters): "4", "Legal", "2,000"
+  records: string | null;   // what the city says, short (at most 14 characters): "4", "None", "1,900 to 2,745"; null renders as EMPTY_VALUE
   label: FindingLabel;
   why: CitedText;           // shown when the row expands
 }
@@ -87,9 +87,41 @@ export interface InfoRow {
   muted?: boolean;          // "No permit on record" style rows
 }
 
+export type HistoryKind = 'permit' | 'complaint' | 'planning' | 'sale' | 'tenant' | 'other';
+
 export interface HistoryRow {
   date: string;             // ISO "2025-05-16", "2022-02" or "2017"
-  text: CitedText;
+  kind: HistoryKind;        // sets the timeline dot: permit info, complaint error, planning warning, sale neutral, tenant warning
+  text: CitedText;          // short: "In-law legalized [4]"
+}
+
+/* ---------- Visual summary (the top of the report; plain words, no jargon) ---------- */
+
+/** Six tiles at the top of the report. Tapping one scrolls to its section. */
+export interface GlanceTile {
+  section: SectionKey;      // 'ledger' | 'cases' | 'costs' | 'tenants' | 'hazards' | 'upside'
+  glyph: Glyph;
+  label: string;            // "Legal units"
+  value: string | null;     // big text: "2", "1", "Buyout 2020". For section 'costs' Plan B fills it from costs.rows (property tax per month)
+  tone: Tone;
+  status: string;           // short plain status beside a dot: "Matches listing", "Probably outdated"
+}
+
+/** One building system as a tile: big year of the last permitted work. */
+export interface SystemRow {
+  glyph: Glyph;
+  title: string;            // "Roof"
+  year: number | null;      // last permitted work; null renders as EMPTY_VALUE
+  status: 'updated' | 'in_progress' | 'old' | 'no_record';
+  text: CitedText;          // shown on tap: "Reroofed, permit complete Mar 6, 2025 [9]"
+}
+
+/** One line of the hazard checklist. */
+export interface HazardCheck {
+  key: 'flood' | 'storm_flood' | 'liquefaction' | 'landslide' | 'tsunami' | 'sea_level' | 'reservoir' | 'soil';
+  title: string;            // "Flood"
+  status: 'clear' | 'note' | 'unknown';
+  text: CitedText;          // "FEMA zone X [11]" or "Inside the Sunset reservoirs' failure zone [17]"
 }
 
 export type CostKind = 'property_tax' | 'supplemental_tax' | 'transfer_tax' | 'case_fees' | 'repair_estimate' | 'insurance_estimate';
@@ -140,9 +172,9 @@ export interface ActionLogEntry {
 }
 
 export interface Decision {
-  tone: 'clear' | 'caution' | 'stop';
-  title: string;            // "Records answer the big questions"
-  text: CitedText;
+  tone: 'clear' | 'caution' | 'stop';   // clear = success, caution = warning, stop = error
+  title: string;            // plain verdict, at most 6 words: "Looks solid", "Get it checked before you offer"
+  inspection: CitedText;    // one sentence on what inspection is needed, if any
 }
 
 export interface Report {
@@ -155,16 +187,19 @@ export interface Report {
   parcelDisplay: string;    // "2162-008"
   meta: { zoning: string | null; neighborhood: string | null; yearBuilt: number | null; lotSqft: number | null };
   listing: { text: string; claims: ListingClaims };
-  answer: CitedText;        // the short answer, 1 to 3 sentences
+  answer: CitedText;        // the short answer under the verdict: 1 or 2 short sentences, at most 220 characters
   decision: Decision;
+  glance: GlanceTile[];     // exactly 6, in this order: ledger, cases, costs, tenants, hazards, upside
+  highlights: { good: CitedText[]; watch: CitedText[] };  // 2 to 5 each, one short line each (at most 90 characters)
   sections: Record<SectionKey, SectionState>;
   ledger: ClaimRow[];
   cases: CaseRow[];
   costs: Costs;
-  bones: InfoRow[];
+  systems: SystemRow[];
   tenants: InfoRow[];
   upside: InfoRow[];
-  around: InfoRow[];
+  hazards: HazardCheck[];
+  nearby: InfoRow[];
   history: HistoryRow[];
   unknowns: Unknown[];
   sources: Source[];

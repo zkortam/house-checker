@@ -12,7 +12,8 @@ maps each to a test.
 - `plans/PLAN-A.md`: data, rules, the agent and the actions (everything under `/api`).
 - `plans/PLAN-B.md`: the interface (every page, primitive and style), built against the contract's mock stream.
 - `plans/CONTRACT.md`: ownership, interfaces, milestones and the shared tests that keep the two from conflicting.
-- `prototype/index.html`: the clickable visual spec.
+- `prototype/index.html`: the clickable visual spec; `prototype/visual-spec/` holds the visual report CSS and markup.
+- `docs/design/`: the Surf design standard (source github.com/zkortam/zakaria-design-docs).
 
 ---
 
@@ -103,6 +104,21 @@ Title: the address. The person sees work, then what changed [ai §26a]:
 - **Stop** stands where the primary button was, only if the server really aborts [ai §6].
 
 ### 3.3 Report (same URL, steps collapse into one line "Read 41 records from 9 city sources")
+
+**Visual first (user feedback, overrides the text-heavy layout below where they differ).** The report is for
+non-technical buyers and must read at a glance, not as a wall of text:
+- Top: a verdict card with a plain title ("Looks solid", "Get it checked before you offer"), one short
+  sentence, and one inspection line.
+- 6 tappable glance tiles (big value + status dot): legal units, open city cases, property tax a month,
+  tenants, hazards, room to grow. Tapping scrolls to the section.
+- "Good news" and "Worth a look": short icon lists, one line each.
+- "Ask before you offer": unknowns grouped by who answers, one action button per group.
+- Listing vs City: big values side by side with a check, clock, crossed circle or question mark between.
+- Costs: a price slider, a big monthly property tax number and 2 mini tiles.
+- Systems as year tiles; hazards as a 2-column checklist; history as a dot timeline with a legend.
+- Sources collapsed; a citation [n] opens a small source sheet with "Open the record". Detail text only on tap.
+The contract carries this as `decision`, `glance`, `highlights`, `systems`, `hazards`, `history[].kind` and
+`LABELS[].compare`; the section list below is the order and the content.
 The report is a briefing, ordered by what changes the buyer's decision. Sections with nothing to say
 collapse to one line ("No open city cases"), never vanish, so absence reads as an answer [principles 8].
 
@@ -199,10 +215,11 @@ proposal sits as a draft beside the report, never sent on its own.
 - Proposed only for a question that documents and records cannot settle (unpermitted work of unknown
   quality, active excavation, a landslide zone with a hillside foundation). The scope comes from the
   finding: e.g. "structural engineer: over-excavation cited in complaint 202665866". No finding, no booking.
-- Shows inspector slots from a real calendar (demo inspector account). Ranked by fit to the scope; the page
+- Shows specialist slots generated locally (next weekdays, 9 AM and 1 PM). Ranked by fit to the scope; the page
   says no one paid for placement and the buyer pays the inspector directly (RESPA §8, B&P §7197).
-- **Book** is irreversible, so it is confirmed: a dialog naming inspector, date, time and price, with Book
-  and Cancel [principles 7] [feedback]. The booking carries the inspection checklist in its notes.
+- **Send request** is outward-facing, so it is confirmed: a dialog naming the specialist, date, time and
+  price, with Send request and Cancel [principles 7] [feedback]. The request email carries the inspection
+  scope and an `.ics` invite; the buyer gets a copy.
 
 **d) Brief for your agent**
 - A short list in plain words, each tied to a finding and its stake ("If the lower unit isn't legal, removing
@@ -225,24 +242,25 @@ Browser (Next.js page)                       Server (Next.js route handlers)
                                               POST /api/actions/book    (after confirm)
 ```
 
-**Stack:** Next.js (App Router) + TypeScript; plain CSS with `tokens.css` from design-digest §1 (no Tailwind
-needed); Phosphor icons (regular + fill); Inter via Google Fonts. Deploy on Vercel. Reports stored in a KV
-store (Vercel KV / Upstash) keyed by id.
+**Stack:** Next.js 16 (App Router) + TypeScript; plain CSS with `tokens.css` from design-digest §1 (no Tailwind
+needed); `@phosphor-icons/react` (regular + fill); Inter. Runs with `npm run start` on the demo machine
+(the LLM is a local CLI, so no serverless deploy). Reports, cache, outbox and idempotency keys are JSON files
+under `.data/` (gitignored). No external database.
 
 **Pipeline (code decides, the model reads and writes):**
-1. `parseListing` — Claude, structured output → `{address, claims: {units, baths, beds, sqft, adu, renovations[]}}`.
+1. `parseListing` — Claude Code CLI, JSON schema output (regex fallback) → `{address, claims: {units, baths, beds, sqft, adu, renovations[]}}`.
 2. `resolveParcel` — address file `ramy-di5m` → all parcels on the base address, lat/lon, lot lineage.
 3. `fetchRecords` — parallel SoQL queries (data.md "Query plan": assessor, building permits, PermitSF,
    plumbing, electrical, inspections, unit certificates, Housing Production, complaints, violation notices,
    Planning, soft-story) and ArcGIS hazard queries. Each emits a `step` event with a real count.
 4. `normalize` — every record becomes `Evidence {id, dataset, recordId, date, title, url, fields}`. Dedupe
    permits by number; never split parcel numbers by position.
-5. `readPermitText` — Claude, structured output, over permit descriptions only:
+5. `readPermitText` — Claude Code CLI, JSON schema output, over permit descriptions only:
    `{recordId, addsBaths, addsUnit, legalizesUnit, garageConversion, citesNov[]}` per permit.
 6. `rules` — deterministic: unit timeline (completed unit-changing permits → certificate → Housing
    Production), bath count from finaled plumbing permits, lien-date lag, labels from the table above.
    Output: `Finding {claim, listing, records, label, evidenceIds[], stake?}`.
-7. `explain` — Claude writes the short answer, each finding's sentence, the email draft, the inspection
+7. `explain` — the Claude Code CLI writes the short answer, each finding's sentence, the email draft, the inspection
    scope and the issues list, citing `[n]` only from `evidenceIds`. A validator rejects any citation not in
    the evidence set and any number that does not appear in the evidence (retry once, then show the
    deterministic sentence).
@@ -253,15 +271,21 @@ store (Vercel KV / Upstash) keyed by id.
 labels; the model reads unstructured permit text and writes, and can't invent a record. The "agent" part is
 the decision (scope, which records to request, whether to inspect) and the actions, each gated by the person.
 
-**Claude API:** `@anthropic-ai/sdk`, model `claude-opus-5-5`. Structured outputs (`output_config.format`) for
-steps 1, 5, 7; effort `low` for 1 and 5, `medium` for 7; streaming for 7. Check `stop_reason` before reading
-content; enable server-side refusal fallbacks (`fallbacks: "default"`). Cache the system prompt.
+**LLM: the local Claude Code CLI, not the Anthropic API.** No API key. `src/server/llm.ts` spawns
+`claude -p --output-format json --no-session-persistence --json-schema '<schema>' --tools "" -- "<prompt>"`
+(`CLAUDE_BIN` overrides the path) and parses the structured result from stdout. Timeout, one retry, at most 3
+concurrent calls, and a deterministic template fallback for steps 1, 5 and 7 so the app works when the CLI
+fails. The short answer is streamed to the page word by word as `delta` events after it is validated.
 
 **Actions:**
-- Email: Resend (or Gmail API) from a verified demo domain. Server holds nothing until the client posts after
-  the Undo window.
-- Booking: Cal.com API (a demo inspector account with an event type) so the booking is real and appears on a
-  calendar. Verify the current Cal.com booking API when building.
+- Email: Resend from the user's Surf account (`RESEND_API_KEY`, `RESEND_FROM`). When unset, the email is
+  written to `.data/outbox/*.json` and the action reads "Saved to outbox (demo)". Server holds nothing until
+  the client posts after the Undo window. Keys are never committed.
+- Specialist request (no Cal.com): slots are generated locally (next weekdays, 9 AM and 1 PM). Confirming
+  sends the specialist a request email with an `.ics` calendar invite attached, and the buyer a copy, through
+  the same Resend/outbox path.
+- Sponsors (tokens& hackathon): Senso.ai context layer (Plan A, `SENSO_API_KEY`) and Amplitude product events
+  (Plan B, `NEXT_PUBLIC_AMPLITUDE_API_KEY`), both off when their keys are missing. See plans/CONTRACT.md §7.
 
 **Demo resilience:** cache every DataSF and ArcGIS response per parcel for 24h; pre-warm the demo addresses
 before presenting. Cached data is real data with its checked time shown, not fixtures [principles 17].
@@ -279,7 +303,8 @@ before presenting. Cached data is real data with its checked time shown, not fix
    closed.
 3. **Act (50s):** the agent sends the listing agent the specific questions and records request (Undo window
    visible); because only a site visit can say whether the basement work is sound, it books a scoped
-   inspection (confirm dialog, booking appears on the calendar). Show the action log.
+   site visit (confirm dialog; the specialist request email with its .ics invite goes out, or lands in the
+   outbox in demo mode). Show the action log.
 4. **No false alarms (30s):** 2055 42nd Ave. Assessor says 1 unit, 1 bath; the agent says 2 units and 4 baths
    are permitted, the illegal-unit case is resolved, and the assessor is behind. It proposes no inspection
    beyond the buyer's usual one; the only unknown is a stale Planning case, so it drafts one question to
@@ -307,6 +332,10 @@ case, active now), 63 Jules Ave (permitted bath, landslide zone), 686 Colby St (
 The build order above is now split across `plans/PLAN-A.md` and `plans/PLAN-B.md`, with shared milestones in
 `plans/CONTRACT.md` §5.
 
-## 7. Decisions still open
-- Email provider (Resend vs Gmail API) and booking provider (Cal.com vs a simple calendar invite).
-- How much time and how many people; that sets whether the disclosure packet reader (A12) stays in scope.
+## 7. Decisions
+- Settled: Resend for email; a request email with an .ics invite instead of a booking provider; the Claude Code
+  CLI instead of the Anthropic API; JSON files instead of a KV store.
+- Open: the disclosure packet reader (A12) is a stretch goal; it stays in only if Plan A finishes A1 to A11.
+
+The demo at the hackathon uses 2055 42nd Ave and 57 Carmelita St (both are golden fixtures); 1665 North Point
+St and the other backups run through the live pipeline.

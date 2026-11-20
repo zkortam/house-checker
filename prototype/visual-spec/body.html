@@ -1,0 +1,121 @@
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-clock" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><path d="M128 72v56h56"/></symbol>
+    <symbol id="i-not" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><path d="M160 96l-64 64M160 160L96 96"/></symbol>
+    <symbol id="i-thumb" viewBox="0 0 256 256"><path d="M32 104h48v112H32a8 8 0 0 1-8-8v-96a8 8 0 0 1 8-8ZM80 104l40-80a32 32 0 0 1 32 32v24h64a16 16 0 0 1 15.9 18l-12 96a16 16 0 0 1-15.9 14H80"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 256 256"><path d="M128 56C48 56 16 128 16 128s32 72 112 72 112-72 112-72-32-72-112-72Z"/><circle cx="128" cy="128" r="40"/></symbol>
+    <symbol id="i-records" viewBox="0 0 256 256"><path d="M48 40h112l48 48v128a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8V48a8 8 0 0 1 8-8Z"/><path d="M160 40v48h48M88 136h80M88 168h80"/></symbol>
+  </defs>
+</svg>
+
+<header class="header">
+  <div class="header-row">
+    <button class="icon-btn" id="backBtn" type="button" aria-label="Back" hidden><svg class="g"><use href="#i-back"/></svg></button>
+    <div class="header-title" id="headerTitle"></div>
+    <button class="icon-btn" id="shareBtn" type="button" aria-label="Share this report" hidden><svg class="g"><use href="#i-share"/></svg></button>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch to dark theme"><svg class="g"><use href="#i-moon"/></svg></button>
+  </div>
+</header>
+
+<main id="content" tabindex="-1">
+  <section class="view column" id="viewStart" aria-labelledby="startTitle">
+    <div class="answer-head">
+      <h1 id="startTitle">Check a home</h1>
+      <p class="row-sub">Paste a San Francisco listing. You get what the city's records say about it, in plain words.</p>
+    </div>
+    <form class="group" id="checkForm" novalidate>
+      <div class="field-wrap" id="fieldWrap">
+        <label for="listing" class="sr-only">Listing text or address</label>
+        <textarea class="field" id="listing" name="listing" placeholder="Paste the listing text or an address" autocomplete="street-address" autocapitalize="sentences" spellcheck="false" enterkeyhint="go"></textarea>
+        <div class="field-foot">
+          <label class="attach" for="packet"><svg class="g" aria-hidden="true" style="width:var(--icon-md);height:var(--icon-md)"><use href="#i-clip"/></svg><span id="packetLabel">Add disclosures</span><input type="file" id="packet" accept="application/pdf"></label>
+          <button class="btn btn-primary" type="submit" id="checkBtn">Check this home</button>
+        </div>
+      </div>
+      <div class="field-error" id="fieldError" role="alert" aria-live="assertive"></div>
+      <div class="chips" role="group" aria-label="Try an example">
+        <button class="chip-btn" type="button" data-fill="p2055">Try 2055 42nd Ave</button>
+        <button class="chip-btn" type="button" data-fill="p57">Try 57 Carmelita St</button>
+      </div>
+    </form>
+    <div class="group">
+      <h2 class="section-label">What you'll see</h2>
+      <div class="tiles">
+        <div class="tile"><span class="tile-label"><svg class="g" aria-hidden="true"><use href="#i-house"/></svg>Is it what the listing says</span><span class="row-sub">Units, baths, size and the in-law, checked against permits</span></div>
+        <div class="tile"><span class="tile-label"><svg class="g" aria-hidden="true"><use href="#i-octagon"/></svg>Open problems</span><span class="row-sub">Complaints, violations and work without a permit</span></div>
+        <div class="tile"><span class="tile-label"><svg class="g" aria-hidden="true"><use href="#i-receipt"/></svg>What it costs to own</span><span class="row-sub">Taxes at your price, and fees from open cases</span></div>
+        <div class="tile"><span class="tile-label"><svg class="g" aria-hidden="true"><use href="#i-question"/></svg>What to ask</span><span class="row-sub">Questions sent for you, to the agent or the city</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view column" id="viewReport" hidden aria-labelledby="reportTitle">
+    <div class="answer-head">
+      <h1 id="reportTitle"></h1>
+      <div class="meta num" id="reportMeta"></div>
+    </div>
+    <div class="group" id="stepsGroup">
+      <h2 class="section-label" id="stepsLabel">Checking city records</h2>
+      <div class="card steps" id="steps" aria-live="polite"></div>
+    </div>
+    <div id="reportBody" class="column" hidden></div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<dialog class="ovl" id="emailDlg" aria-labelledby="emailTitle">
+  <form class="ovl-inner" id="emailForm" method="dialog" novalidate>
+    <div class="ovl-head">
+      <h2 class="ovl-title" id="emailTitle">Email the listing agent</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="form-row"><label for="emailTo">To</label><input class="input" id="emailTo" type="email" inputmode="email" autocomplete="email" placeholder="Listing agent's email" enterkeyhint="next"></div>
+    <div class="form-row"><label for="emailSubject">Subject</label><input class="input" id="emailSubject" type="text" autocomplete="off" enterkeyhint="next"></div>
+    <div class="form-row"><label for="emailBody" class="sr-only">Message</label><textarea class="input" id="emailBody" data-autofocus></textarea></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary" type="submit" style="min-width:104px">Send</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ovl" id="bookDlg" aria-labelledby="bookTitle">
+  <form class="ovl-inner" id="bookForm" method="dialog" novalidate>
+    <div class="ovl-head">
+      <h2 class="ovl-title" id="bookTitle">Choose a time</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="confirm-facts" id="bookFacts"></div>
+    <div class="slot-list" role="radiogroup" aria-label="Times" id="slots"></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary" type="submit" style="min-width:104px">Continue</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ovl sm" id="confirmDlg" aria-labelledby="confirmTitle">
+  <form class="ovl-inner" method="dialog" id="confirmForm">
+    <h2 class="ovl-title" id="confirmTitle" style="padding-top:0"></h2>
+    <div class="confirm-facts" id="confirmFacts"></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary" type="submit" style="min-width:104px">Book</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ovl sm" id="srcDlg" aria-labelledby="srcTitle">
+  <div class="ovl-inner">
+    <div class="ovl-head">
+      <h2 class="ovl-title" id="srcTitle"></h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="meta" id="srcMeta"></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Close</button>
+      <a class="btn btn-primary" id="srcOpen" target="_blank" rel="noopener">Open the record</a>
+    </div>
+  </div>
+</dialog>

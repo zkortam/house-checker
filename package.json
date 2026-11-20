@@ -1,12 +1,26 @@
 {
   "name": "house-checker",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Checks a San Francisco listing against city records and acts on what is still unknown.",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "2.1.10",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "typescript": "5.6.3"
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
   }
 }
