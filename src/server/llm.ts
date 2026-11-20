@@ -10,19 +10,28 @@ import { spawn } from 'node:child_process';
 
 const MAX_CONCURRENT = 3;
 let active = 0;
-const queue: Array<() => void> = [];
+const queue: Waiter[] = [];
 
-/** A slot for one CLI call. `first` jumps the queue (the writer is on the user's critical path); gives up after maxWaitMs. */
+/**
+ * A slot for one CLI call. Background calls (the permit reader) may use all but one slot, so the writer, which is on
+ * the user's critical path, always has one free. `first` also jumps the queue; gives up after maxWaitMs.
+ */
+type Waiter = { first: boolean; take: () => void };
+const can = (first: boolean) => active < (first ? MAX_CONCURRENT : MAX_CONCURRENT - 1);
 async function acquire(first = false, maxWaitMs = Infinity): Promise<boolean> {
-  if (active < MAX_CONCURRENT) { active++; return true; }
+  if (can(first)) { active++; return true; }
   return new Promise<boolean>((resolve) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const take = () => { if (timer) clearTimeout(timer); active++; resolve(true); };
-    if (first) queue.unshift(take); else queue.push(take);
-    if (Number.isFinite(maxWaitMs)) timer = setTimeout(() => { const i = queue.indexOf(take); if (i >= 0) queue.splice(i, 1); resolve(false); }, maxWaitMs);
+    const w: Waiter = { first, take: () => { if (timer) clearTimeout(timer); active++; resolve(true); } };
+    if (first) queue.unshift(w); else queue.push(w);
+    if (Number.isFinite(maxWaitMs)) timer = setTimeout(() => { const i = queue.indexOf(w); if (i >= 0) queue.splice(i, 1); resolve(false); }, maxWaitMs);
   });
 }
-function release(): void { active--; const next = queue.shift(); if (next) next(); }
+function release(): void {
+  active--;
+  const i = queue.findIndex((w) => can(w.first));
+  if (i >= 0) queue.splice(i, 1)[0].take();
+}
 
 export function llmEnabled(): boolean {
   return (process.env.HC_LLM ?? 'on') !== 'off' && process.env.NODE_ENV !== 'test' && !process.env.VITEST;
