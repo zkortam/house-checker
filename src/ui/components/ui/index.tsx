@@ -202,6 +202,10 @@ export function Collapse({ open, id, children }: { open: boolean; id?: string; c
 
 const EXIT_MS = 192; // --ovl-dur 240 x --exit-ratio 0.8, read from the same tokens
 
+/** Open dialogs, bottom to top. */
+const openStack: object[] = [];
+function dropFromStack(t: object) { const i = openStack.lastIndexOf(t); if (i >= 0) openStack.splice(i, 1); }
+
 export function Dialog({ open, onClose, title, children, foot, size = 'md', labelledTitle = true }: {
   open: boolean; onClose: () => void; title: ReactNode; children?: ReactNode; foot?: ReactNode; size?: 'sm' | 'md'; labelledTitle?: boolean;
 }) {
@@ -210,6 +214,8 @@ export function Dialog({ open, onClose, title, children, foot, size = 'md', labe
   const pushed = useRef(false);
   const tid = useId();
   const [mounted, setMounted] = useState(open);
+  const [token] = useState(() => ({}));
+  useEffect(() => () => dropFromStack(token), [token]);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -223,8 +229,11 @@ export function Dialog({ open, onClose, title, children, foot, size = 'md', labe
       d.showModal();
       d.removeAttribute('data-state');
       requestAnimationFrame(() => requestAnimationFrame(() => d.setAttribute('data-state', 'open')));
+      openStack.push(token);
       try { history.pushState({ hcDialog: true }, ''); pushed.current = true; } catch { pushed.current = false; }
     } else if (!open && d.open) {
+      // Leave the stack after this popstate has been handled by every listener, never inside onPop.
+      dropFromStack(token);
       d.setAttribute('data-state', 'closed');
       const t = setTimeout(() => {
         d.close();
@@ -245,7 +254,8 @@ export function Dialog({ open, onClose, title, children, foot, size = 'md', labe
 
   useEffect(() => {
     if (!open) return;
-    const onPop = () => { if (pushed.current) { pushed.current = false; onCloseRef.current(); } };
+    // Back closes only the topmost open dialog; a sheet under a source sheet stays open.
+    const onPop = () => { if (pushed.current && openStack[openStack.length - 1] === token) { pushed.current = false; onCloseRef.current(); } };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [open]);
