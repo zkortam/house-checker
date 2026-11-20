@@ -5,7 +5,7 @@ import type { PacketFinding,
 import { mockStream } from '@contract/mock-stream';
 import { FIXTURES, findFixture } from './fixtures';
 import type { Result, RunOptions } from './index';
-import { LOCALE } from '../lib/format';
+import { slotLabel } from '../lib/format';
 
 const STEP_SECTION: Record<string, SectionKey> = {
   roll: 'ledger', permits: 'ledger', trade_permits: 'systems', complaints: 'cases', planning: 'cases',
@@ -83,7 +83,7 @@ export async function book(req: BookRequest): Promise<ActionResult> {
   await wait(500);
   const f = byId(req.reportId);
   const u = f?.report.unknowns.find((x) => x.id === req.unknownId);
-  const when = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(req.slot));
+  const when = slotLabel(req.slot);
   const entry: ActionLogEntry = {
     id: req.idempotencyKey, kind: 'book_specialist', unknownIds: [req.unknownId], at: new Date().toISOString(),
     summary: `Sent a visit request to a ${u?.specialist ?? 'specialist'} for ${when}. Saved to outbox (demo)`,
