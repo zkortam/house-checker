@@ -51,6 +51,8 @@ describe('errors', () => {
     expect(failed.map((e) => (e as { id: string }).id)).toEqual(['complaints']);
     expect(report!.sections.cases).toEqual({ state: 'error', source: 'DBI complaints', retryable: true });
     expect(report!.sections.ledger.state).toBe('ok');
+    expect(report!.glance[1]).toMatchObject({ section: 'cases', value: null, tone: 'neutral', status: 'Not checked' });
+    expect(report!.answer).toMatch(/City complaints couldn't be read this time\.$/);
     expect(events.at(-1)?.type).toBe('done');
   });
 

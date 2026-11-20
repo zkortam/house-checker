@@ -1,1 +1,1 @@
-{"url":"https://data.sf.gov/resource/bna4-itif.json?%24where=intersects%28the_geom%2C%27POINT%28-122.41127492690553+37.72183554101281%29%27%29&%24select=gridcode","at":"2026-11-20T21:07:54.251Z","body":[{"gridcode":"7"}]}
+{"url":"https://data.sf.gov/resource/bna4-itif.json?%24where=intersects%28the_geom%2C%27POINT%28-122.41127492690553+37.72183554101281%29%27%29&%24select=gridcode","at":"2026-11-20T22:12:28.634Z","body":[{"gridcode":"7"}]}

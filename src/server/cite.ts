@@ -90,6 +90,14 @@ export const S = {
     url: R + 'wmam-7g8d.json?$where=' + encodeURIComponent(`upper(address) like '${like}'`), dataset: 'wmam-7g8d',
   }),
   street: (parcel: string, address: string): Source => ({ id: `street:${parcel}`, title: `Street-space permits, ${address}`, publisher: 'SF Public Works', date: null, url: D + 'fxfq-npa9', dataset: 'fxfq-npa9' }),
+  lineage: (parcel: string, old: string, date: string | null): Source => ({
+    id: `lineage:${parcel}:${old}`, title: `Lot history: parcel ${parcel} created from ${old}`, publisher: 'SF Public Works, mapping', date,
+    url: `${R}nqyt-nfmd.json?blklot=${parcel}`, dataset: 'nqyt-nfmd',
+  }),
+  parentPermit: (p: Row): Source => ({
+    id: `permit:${p.permit_number}`, title: `Building permit ${p.permit_number}, parent lot ${p.block}${p.lot}, ${shortWhat(p.description, 'building work')}`, publisher: 'DBI',
+    date: day(p.completed_date ?? p.issued_date ?? p.filed_date), url: `${R}i98e-djp9.json?permit_number=${p.permit_number}`, dataset: 'i98e-djp9',
+  }),
   noBuyout: (parcel: string): Source => ({ id: `buyout:${parcel}`, title: 'Tenant buyout declarations', publisher: 'SF Rent Board', date: null, url: D + 'wmam-7g8d', dataset: 'wmam-7g8d' }),
   hotelTax: (slug: string, address: string, start: string | null): Source => ({
     id: `business:hotel-tax:${slug}`, title: `Registered businesses with hotel tax, ${address}`, publisher: 'SF Treasurer and Tax Collector', date: start, url: D + 'g8m3-pdis', dataset: 'g8m3-pdis',

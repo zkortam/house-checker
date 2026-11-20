@@ -1,0 +1,1 @@
+{"url":"https://data.sf.gov/resource/fxfq-npa9.json?%24where=upper%28permit_address%29+like+%27301+MISSION%25%27+AND+status%3D%27Active%27&%24select=permit_number%2Cpermit_type%2Cstatus%2Cpermit_start_date%2Cpermit_end_date%2Cpermit_address%2Cdbi_permit_number&%24limit=50","at":"2026-11-20T22:12:30.165Z","body":[]}

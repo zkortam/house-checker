@@ -59,17 +59,38 @@ the short answer, and falls back to rule-written sentences when the CLI is missi
 
 Data lives in `.data/` (reports, 24 h cache, outbox, idempotency keys). It is gitignored.
 
-## Status (Nov 20, 2026)
+## Screenshots
 
-- Works end to end in real mode: paste a listing, live steps from 15+ DataSF sources, the visual report, email
+| Verdict and tiles | Listing vs City | Specialist request | Phone |
+|---|---|---|---|
+| ![Verdict and tiles](submission/screenshots/1-verdict-and-tiles.png) | ![Listing vs City](submission/screenshots/2-listing-vs-city.png) | ![Specialist request](submission/screenshots/3-specialist-request-confirm.png) | ![Phone](submission/screenshots/4-phone-2055.png) |
+
+Demo video: [submission/demo.mp4](submission/demo.mp4) (2:18). Submission answers: [submission/SUBMISSION.md](submission/SUBMISSION.md).
+
+## Live demo
+
+1. `npm run build && npm run start` with `.env.local` holding `NEXT_PUBLIC_MOCK=0` and `HC_DEMO_RECORDINGS=1`
+   (recorded city data for the 6 demo addresses, so DataSF latency can't stall the demo).
+2. Open http://localhost:3000, tap **Try 57 Carmelita St**, then **Check this home**. Walk the verdict, the
+   tiles, **Request a visit** (pick a time, Continue, **Send request**) and **Email the listing agent** (type
+   any address, Send, watch the 5 s Undo). Scroll to **What you sent**.
+3. Back, **Try 2055 42nd Ave**: "Looks solid", the assessor is behind the permits. Tap a citation number to
+   open the source sheet and **Open the record**.
+4. Emails land in `.data/outbox/` unless `RESEND_API_KEY` and `RESEND_FROM` are set. The script is in
+   `submission/demo-script.md`; `node scripts/demo-check.mjs` runs the same flow headless.
+
+## Status (Nov 20, 2026, final)
+
+- Works end to end in real mode: paste a listing, live steps from 20+ DataSF sources, the visual report, email
   the listing agent or the city (5 s Undo, idempotent), request a structural engineer (confirm dialog, request
-  email with an `.ics` invite), action log restored on refresh, share link.
-- Demo addresses: 2055 42nd Ave and 57 Carmelita St (golden fixtures, labels and source ids match the live
-  pipeline), 1665 North Point St, 998 Burnett Ave, 63 Jules Ave, 686 Colby St. All six stream to `done` in
-  15 to 22 s with no failed step.
+  email with an `.ics` invite), action log restored on refresh, share link, display settings (theme, text
+  size, reduced motion).
+- Demo addresses: 2055 42nd Ave and 57 Carmelita St (golden fixtures; labels and source ids match the live
+  pipeline), 1665 North Point St, 998 Burnett Ave, 63 Jules Ave, 686 Colby St. All stream to `done` in about
+  15 to 22 s. Any other SF address runs live against DataSF; very large condo buildings take longer.
 - Demo mode: without Resend keys, emails land in `.data/outbox/`. The specialist is a placeholder address.
-- Not done: Gmail sending, lot lineage for pre-split permits, a font-size or reduced-motion settings control.
-  The disclosure packet reader works on the API but its section has no rich rendering yet.
+  Senso and Amplitude are wired but off without keys.
+- Not done: Gmail sending (needs OAuth consent); disclosure-packet findings render once Plan B ships it.
 
 ## Not advice
 

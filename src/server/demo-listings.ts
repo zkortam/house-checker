@@ -6,4 +6,6 @@ export const DEMO_LISTINGS: Array<{ key: string; text: string }> = [
   { key: '998-burnett-ave', text: 'Example listing: 998 Burnett Ave, San Francisco. Twin Peaks home with sweeping views. 2 bed, 2 bath, about 1,400 sq ft. Offered at $1,295,000.' },
   { key: '63-jules-ave', text: 'Example listing: 63 Jules Ave, San Francisco. Updated Ingleside Terraces home with a new bath downstairs. 3 bed, 2 bath, about 1,250 sq ft. Offered at $1,149,000.' },
   { key: '686-colby-st', text: 'Example listing: 686 Colby St, San Francisco. Portola home with a legal in-law unit. 2 units, 2 bath, about 1,580 sq ft. Offered at $1,099,000.' },
+  { key: '1200-masonic-ave', text: 'Example listing: 1200 Masonic Ave, San Francisco. Haight-Ashbury five-unit building. 5 units, 5 bed, 4 bath, about 4,900 sq ft. Offered at $3,995,000.' },
+  { key: '301-mission-st-45e', text: 'Example listing: 301 Mission St #45E, San Francisco. Millennium Tower condo with bay views. 2 bed, 2 bath, about 1,400 sq ft. Offered at $1,800,000.' },
 ];

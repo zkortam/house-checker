@@ -1,0 +1,1 @@
+{"url":"https://data.sf.gov/resource/7p2k-c3z6.json?%24where=intersects%28the_geom%2C%27POINT%28-122.39614287170173+37.790649361455344%29%27%29&%24select=count%28*%29+as+n","at":"2026-11-20T22:12:30.229Z","body":[{"n":"1"}]}

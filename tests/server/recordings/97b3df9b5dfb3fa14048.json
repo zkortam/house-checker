@@ -1,0 +1,1 @@
+{"url":"https://data.sf.gov/resource/3i4a-hu95.json?%24where=intersects%28the_geom%2C%27POINT%28-122.4451311301378+37.77010697998973%29%27%29&%24select=zoning%2Czoning_sim%2Cdistrictna%2Cgen%2Ccodesectio","at":"2026-11-20T22:12:29.174Z","body":[{"zoning":"NCD-HAIGHT","zoning_sim":"NCD","districtna":"HAIGHT STREET NEIGHBORHOOD COMMERCIAL","gen":"Mixed Use","codesectio":"719.1"}]}

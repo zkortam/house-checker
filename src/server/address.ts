@@ -102,3 +102,13 @@ export function parcelDisplay(parcels: ParcelRef[]): string {
   const one = (p: ParcelRef) => `${p.block}-${p.lot}`;
   return parcels.length === 1 ? one(parcels[0]) : `${one(parcels[0])} and ${parcels.length - 1} more`;
 }
+
+/** For a model-returned address with no street type ("1200 Cole"): number + name; the resolver then matches any type. */
+export function parseAddressLoose(s: string): ParsedAddress | null {
+  const strict = parseAddress(s);
+  if (strict) return strict;
+  const m = s.trim().match(/^(\d{1,5})([A-Za-z])?\s+([A-Za-z0-9][A-Za-z0-9 .'-]{1,40}?)\s*(?:,|$)/);
+  if (!m) return null;
+  const street = m[3].trim().toUpperCase().replace(/\s+/g, ' ');
+  return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit: null };
+}
