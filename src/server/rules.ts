@@ -119,7 +119,8 @@ export function buildReport(input: RuleInput): Report {
   const housingRow = (raw.housing ?? []).find((h) => n(h.net_units_completed)) ?? null;
   let recordUnits: number | null = lastUnitPermit ? n(lastUnitPermit.proposed_units) : null;
   if (recordUnits == null) {
-    const latestWithUnits = permits.filter(isComplete).find((p) => n(p.proposed_units) != null);
+    // A permit with 0 proposed units is usually a commercial or partial-scope filing, not the building's count.
+    const latestWithUnits = permits.filter(isComplete).find((p) => (n(p.proposed_units) ?? 0) > 0);
     recordUnits = latestWithUnits ? n(latestWithUnits.proposed_units) : rollUnits && rollUnits > 0 ? rollUnits : null;
   }
   const unitLegalized = !!lastUnitPermit && /legaliz|adu/.test(lower(lastUnitPermit.description));
