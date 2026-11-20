@@ -18,16 +18,23 @@ function numbersIn(s: string): Set<string> {
   return new Set((s.match(NUM) ?? []).map((x) => x.replace(/[,.]$/, '').replace(/,/g, '')));
 }
 
-export function acceptable(text: string, evidence: string, sourceCount: number, maxLength: number): boolean {
-  if (!text || typeof text !== 'string') return false;
-  if (checkCopy(text, { maxLength }).length) return false;
-  if (checkCitations(text, sourceCount).length) return false;
+/** Why a candidate is rejected, or null when it passes. */
+export function rejectReason(text: string, evidence: string, sourceCount: number, maxLength: number): string | null {
+  if (!text || typeof text !== 'string') return 'empty';
+  const copy = checkCopy(text, { maxLength });
+  if (copy.length) return `copy: ${copy.map((p) => p.rule).join(',')}`;
+  const cites = checkCitations(text, sourceCount);
+  if (cites.length) return `citations: ${cites.map((p) => p.rule).join(',')}`;
   const allowed = numbersIn(evidence);
   for (const m of text.replace(/\[\d+\]/g, '').match(NUM) ?? []) {
     const v = m.replace(/[,.]$/, '').replace(/,/g, '');
-    if (!allowed.has(v)) return false;
+    if (!allowed.has(v)) return `new number ${v}`;
   }
-  return true;
+  return null;
+}
+
+export function acceptable(text: string, evidence: string, sourceCount: number, maxLength: number): boolean {
+  return rejectReason(text, evidence, sourceCount, maxLength) === null;
 }
 
 const SCHEMA = {
@@ -70,7 +77,11 @@ export async function writeProse(report: Report): Promise<Report> {
   }
   const { value, source } = await llmJson<{ answer: string; inspection: string }>(SCHEMA, prompt,
     () => ({ answer: report.answer, inspection: report.decision.inspection }),
-    { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, first: true, maxWaitMs: 10_000, validate: (v) => acceptable(v.answer, evidence, sources, 220) && acceptable(v.inspection, evidence, sources, 240) });
+    { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, first: true, maxWaitMs: 10_000, validate: (v) => {
+      const why = rejectReason(v.answer, evidence, sources, 220) ?? rejectReason(v.inspection, evidence, sources, 240);
+      if (why && process.env.HC_DEBUG) console.warn('[writer] rejected:', why, '|', v.answer, '|', v.inspection);
+      return !why;
+    } });
   if (source === 'fallback') return { ...report, answerBy: 'rules' };
   try { await mkdir(path.dirname(cacheFile), { recursive: true }); await writeFile(cacheFile, JSON.stringify({ answer: value.answer.trim(), inspection: value.inspection.trim() })); } catch { /* best effort */ }
   return { ...report, answer: value.answer.trim(), decision: { ...report.decision, inspection: value.inspection.trim() }, answerBy: 'ai' };
