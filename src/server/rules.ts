@@ -636,6 +636,7 @@ export function buildReport(input: RuleInput): Report {
   }
   const clip = (s: string) => (s.length <= 90 ? s : s.slice(0, 87).replace(/\s+\S*$/, '') + '...');
   if (unknowns.some((u) => u.specialist === 'structural engineer')) for (const h of hazards) h.text = h.text.replace('Worth raising with a structural engineer', 'Worth raising with the structural engineer');
+  watch.sort((a, b) => Number(/^Unsafe building/.test(b)) - Number(/^Unsafe building/.test(a))); // the most serious first
   const highlights = { good: good.slice(0, 5).map(clip), watch: watch.slice(0, 5).map(clip) };
   // The contract wants 2 to 5 good-news lines; plain, cited facts fill the gap.
   const fillers = [
