@@ -80,6 +80,8 @@ export function buildReport(input: RuleInput): Report {
   const latestYear = rollRows.reduce((m, r) => Math.max(m, Number(r.closed_roll_year ?? 0)), 0);
   const roll = rollRows.find((r) => Number(r.closed_roll_year) === latestYear) ?? null;
   const rollSrc = roll ? S.roll(roll.parcel_number ?? pid, String(latestYear)) : null;
+  // An address-only check has no ledger to cite the roll first, so it would show up as [15] in the opening answer.
+  if (rollSrc && claims.units == null && claims.beds == null && claims.baths == null && claims.sqft == null && !claims.adu && !claims.renovations?.length) cites.n(rollSrc);
   const lien = latestYear ? `${latestYear}-01-01` : null;
   const yearBuilt = n(roll?.year_property_built) || null;
   const lotSqft = n(roll?.lot_area) || null;
