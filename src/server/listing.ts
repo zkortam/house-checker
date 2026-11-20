@@ -77,7 +77,7 @@ export async function readListing(text: string): Promise<ListingResult> {
   if (clean.length < 8) return { ok: false, kind: 'invalid' };
   if (OTHER_CITIES.test(clean) && !SF.test(clean.replace(/south san francisco/ig, ''))) return { ok: false, kind: 'outside_sf' };
   const regex = readListingRegex(clean);
-  const agentEmail = clean.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? null;
+  const agentEmail = clean.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0] ?? null; // no trailing sentence period
   const missing = !regex.address || regex.price == null || (regex.beds == null && regex.baths == null);
   if (!missing) return { ok: true, claims: regex, agentEmail };
   const digits = clean.replace(/[,\s]/g, '');
