@@ -420,3 +420,4 @@ dialog.ovl.sm { }
 
 .cite-run { white-space: nowrap; }
 .tone-neutral { --tone: var(--text-muted); }
+@media (min-width: 520px) { .mini-grid:has(> :nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

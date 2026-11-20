@@ -57,9 +57,11 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
           </Group>
         ) : null}
 
-        <Group id={sectionId('cases')} title={S.casesTitle}>
-          <SectionBody state={sec('cases')} onRetry={onRetry}><Cases rows={report.cases} /></SectionBody>
-        </Group>
+        {show('cases', report.cases.length) ? (
+          <Group id={sectionId('cases')} title={S.casesTitle}>
+            <SectionBody state={sec('cases')} onRetry={onRetry}><Cases rows={report.cases} /></SectionBody>
+          </Group>
+        ) : null}
 
         <Group id={sectionId('costs')} title={S.costsTitle}>
           <SectionBody state={sec('costs')} onRetry={onRetry}><CostsView costs={report.costs} /></SectionBody>
