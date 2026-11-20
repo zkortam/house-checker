@@ -70,7 +70,7 @@ export function StartScreen() {
     const r = await startRun(t, { packetFileId, failStep });
     setBusy(false);
     if ('reportId' in r) router.push(`/check/${encodeURIComponent(r.reportId)}`);
-    else { setError(errorText(r.error)); field.current?.focus(); }
+    else { setError(errorText(r.error, 'start')); field.current?.focus(); }
   }
 
   return (
