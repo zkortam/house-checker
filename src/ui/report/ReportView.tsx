@@ -96,13 +96,13 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
 
         <footer className="rv-foot">
           <div className="pills">
-            <button type="button" className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
+            <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
               <U name="external" />{fill(S.sourcesN, { n: report.sources.length })}
-            </button>
+            </Pressable>
             {log.length ? (
-              <button type="button" className="pill" onClick={() => open(S.actionsTitle, <ActionLog entries={log} />)}>
+              <Pressable className="pill" onClick={() => open(S.actionsTitle, <ActionLog entries={log} />)}>
                 <U name="done" />{fill(S.sentN, { n: log.length })}
-              </button>
+              </Pressable>
             ) : null}
           </div>
           <p className="fineprint">{S.disclaimer}</p>
@@ -229,7 +229,7 @@ function TaxCard({ costs, price, setPrice, onHow }: { costs: Costs; price: numbe
         {transfer ? <span><b className="num">{money(transfer.amount)}</b>{S.transferShort}</span> : null}
         {fees ? <span className="tone-error"><b className="num ink">{money(fees.amount)} {S.perMonth}</b>{S.caseFeesShort}</span> : null}
       </div>
-      <button type="button" className="b-link" onClick={onHow}>{S.howWorkedOut}<U name="caret" className="rot" /></button>
+      <Pressable className="b-link" onClick={onHow}>{S.howWorkedOut}<U name="caret" className="rot" /></Pressable>
     </div>
   );
 }
@@ -290,9 +290,9 @@ function AskRow({ unknowns, log, onAction, onOpen }: {
               <span className="ask-ic" aria-hidden="true"><U name={g.icon} /></span>
               <span className="ask-who">{g.title}</span>
               <span className="ask-q">{g.items[0].title}</span>
-              <button type="button" className="b-link" onClick={() => onOpen(g.title, g.items, button)}>
+              <Pressable className="b-link" onClick={() => onOpen(g.title, g.items, button)}>
                 {plural(g.items.length, S.questionsOne, S.questions)}<U name="caret" className="rot" />
-              </button>
+              </Pressable>
               <div className="ask-btn">{button}</div>
             </div>
           );
@@ -320,7 +320,7 @@ function Highlight({ kind, lines, onAll }: { kind: 'good' | 'watch'; lines: stri
     <div className={`b-card span-2 hl-card tone-${tone}`}>
       <span className="b-label ink"><U name={kind === 'good' ? 'same' : 'watch'} />{kind === 'good' ? S.goodNews : S.worthALook}</span>
       <HlList lines={lines.slice(0, 3)} kind={kind} />
-      {lines.length > 3 ? <button type="button" className="b-link" onClick={onAll}>{fill(S.showAllN, { n: lines.length })}<U name="caret" className="rot" /></button> : null}
+      {lines.length > 3 ? <Pressable className="b-link" onClick={onAll}>{fill(S.showAllN, { n: lines.length })}<U name="caret" className="rot" /></Pressable> : null}
     </div>
   );
 }
@@ -344,7 +344,7 @@ function BonesCard({ rows, built, onOpen }: { rows: SystemRow[]; built: number |
             <Pressable key={i} className={`bone tone-${st.tone}`} onClick={() => onOpen(r)} aria-label={`${r.title}: ${r.year ?? st.text}`}>
               <span className="bone-t"><G glyph={r.glyph} />{r.title}</span>
               <span className="bone-track" aria-hidden="true">
-                {pct != null ? <><span className="bone-fill" style={{ width: `${pct}%` }} /><span className="bone-dot" style={{ left: `${pct}%` }} /></> : <span className="bone-none" />}
+                {pct != null ? <><span className="bone-fill" style={{ ['--p' as string]: `${pct}%` }} /><span className="bone-dot" style={{ ['--p' as string]: `${pct}%` }} /></> : <span className="bone-none" />}
               </span>
               <span className="bone-y num">{r.year ?? EMPTY_VALUE}</span>
             </Pressable>
@@ -370,7 +370,7 @@ function TimelineCard({ rows, onOpen }: { rows: HistoryRow[]; onOpen: () => void
       <span className="b-label">{S.timelineTitle}</span>
       <span className="tl-axis" aria-hidden="true">
         {rows.map((r, i) => (
-          <span key={i} className={`tl-pin tone-${HISTORY_TONE[r.kind]}`} style={{ left: `${((yr(r.date) - from) / (now - from)) * 100}%` }} />
+          <span key={i} className={`tl-pin tone-${HISTORY_TONE[r.kind]}`} style={{ ['--p' as string]: `${((yr(r.date) - from) / (now - from)) * 100}%` }} />
         ))}
       </span>
       <span className="axis num" aria-hidden="true"><span>{from}</span><span>{now - 1}</span></span>
