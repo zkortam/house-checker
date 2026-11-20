@@ -548,7 +548,8 @@ export function buildReport(input: RuleInput): Report {
   /* ----- glance ----- */
   const unitsRow = ledger.find((r) => r.key === 'units');
   const unitTone: Tone = aduRow?.label === 'no_permit_found' ? 'error' : unitsRow ? LABELS[unitsRow.label].tone : 'neutral';
-  const openCount = cases.length;
+  // A summary card ("25 more open complaints") stands for that many cases.
+  const openCount = cases.reduce((n, x) => n + (Number(x.title.match(/^(\d+) more open complaints$/)?.[1]) || 1), 0);
   const notes = hazards.filter((h) => h.status === 'note');
   const firstNote = notes[0];
   const hazardStatus = !firstNote ? (hazards.length ? 'All clear' : 'Not checked')
