@@ -855,7 +855,7 @@ function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: Case
   if (x.openPlanning[0]) qs.push(`Do you know whether Planning has closed enforcement case ${x.openPlanning[0].record_id}?`);
   const listingAgentEmail: EmailDraft | null = qs.length ? {
     to: x.agentEmail, subject: `Questions about ${a}`,
-    body: `Hi,\n\nI'm interested in ${a} and have a few questions before making an offer.\n\n${qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nThanks,\n`,
+    body: `Hi,\n\nI'm interested in ${a} and have ${qs.length === 1 ? 'a question' : 'a few questions'} before making an offer.\n\n${qs.length === 1 ? qs[0] : qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nThanks,\n`,
     unknownIds: ids,
   } : null;
   const p = x.openPlanning[0];
