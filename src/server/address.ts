@@ -28,7 +28,7 @@ export function parseAddress(text: string): ParsedAddress | null {
   const type = TYPES[typeRaw.toLowerCase()] ?? null;
   const display = `${number}${suffix ? suffix.toUpperCase() : ''} ${title(street)}${type ? ' ' + TYPE_DISPLAY[type] : ''}`;
   const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
-  const unit = after.match(/^\s*,?\s*(?:#|unit\s+|apt\.?\s+|suite\s+|no\.\s*)([A-Za-z0-9-]{1,6})\b/i)?.[1]?.toUpperCase() ?? null;
+  const unit = after.match(/^\s*,?\s*(?:#|unit\s+|apt\.?\s+|suite\s+|no\.\s*)(\d{1,5}\s?[A-Za-z](?![A-Za-z])|[A-Za-z0-9-]{1,6})\b/i)?.[1]?.toUpperCase().replace(/\s+/g, '') ?? null;
   return { number, suffix: suffix ? suffix.toUpperCase() : null, street, type, display, unit };
 }
 
@@ -76,7 +76,8 @@ export async function resolveAddress(a: ParsedAddress): Promise<ResolvedAddress 
   for (const r of rows) if (r.parcel_number && r.block && r.lot) parcels.set(r.parcel_number, { parcel: r.parcel_number, block: r.block, lot: r.lot });
   const units = [...new Set(rows.filter((r) => r.address_number_suffix || r.unit_number)
     .map((r) => `${r.address_number}${r.address_number_suffix ?? ''}${r.unit_number ? ' #' + r.unit_number : ''}`))];
-  const unitRow = a.unit ? rows.find((r) => (r.unit_number ?? '').toUpperCase() === a.unit) : undefined;
+  const norm = (u: string) => u.toUpperCase().replace(/[\s-]+/g, '');
+  const unitRow = a.unit ? rows.find((r) => norm(r.unit_number ?? '') === norm(a.unit!)) : undefined;
   const first = unitRow ?? rows.find((r) => !r.address_number_suffix && !r.unit_number) ?? rows[0];
   const primary = first.parcel_number;
   return {

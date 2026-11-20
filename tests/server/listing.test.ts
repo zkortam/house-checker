@@ -41,3 +41,10 @@ describe('loose addresses from the model', () => {
     expect(parseAddressLoose('Cole Street')).toBeNull();
   });
 });
+
+describe('unit spellings', () => {
+  it('reads "#15 A" as unit 15A', () => {
+    expect(parseAddress('501 Beale St #15 A, San Francisco')).toMatchObject({ unit: '15A' });
+    expect(parseAddress('1 Main St #1504 SF')).toMatchObject({ unit: '1504' });
+  });
+});

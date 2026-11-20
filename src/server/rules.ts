@@ -583,7 +583,15 @@ export function buildReport(input: RuleInput): Report {
   }
   const clip = (s: string) => (s.length <= 90 ? s : s.slice(0, 87).replace(/\s+\S*$/, '') + '...');
   const highlights = { good: good.slice(0, 5).map(clip), watch: watch.slice(0, 5).map(clip) };
-  if (!highlights.good.length) highlights.good.push('Records were found for this address');
+  // The contract wants 2 to 5 good-news lines; plain, cited facts fill the gap.
+  const fillers = [
+    !failed.has('complaints') && !cases.length ? 'No open complaints or city cases' : '',
+    yearBuilt && rollSrc ? `Built in ${yearBuilt}, on the assessor's roll ${c(rollSrc)}` : '',
+    hz && hz.femaZone && !/^(A|V)/.test(hz.femaZone) ? `Outside FEMA flood zones ${c(S.hazards(pid))}` : '',
+    assessed && rollSrc ? `Assessed at ${money(assessed)} as of ${fmtDate(lien)} ${c(rollSrc)}` : '',
+    'Records were found for this address',
+  ].filter(Boolean);
+  for (const f of fillers) { if (highlights.good.length >= 2) break; if (!highlights.good.includes(f)) highlights.good.push(clip(f)); }
   if (!highlights.watch.length) highlights.watch.push('Nothing stands out in the records');
 
   /* ----- history ----- */
