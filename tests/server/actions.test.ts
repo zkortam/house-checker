@@ -74,3 +74,40 @@ describe('refresh mid-run', () => {
     expect(await getReportOrWait('nope', 10)).toBeNull();
   });
 });
+
+describe('Resend path (mock server)', () => {
+  it('sends real recipients with base64 attachments, keeps placeholders and refusals in the outbox', async () => {
+    const { createServer } = await import('node:http');
+    const seen: Array<{ auth?: string; key?: string; body: any }> = [];
+    let status = 200;
+    const server = createServer((req, res) => {
+      let b = '';
+      req.on('data', (d) => { b += d; });
+      req.on('end', () => {
+        seen.push({ auth: req.headers.authorization, key: req.headers['idempotency-key'] as string, body: JSON.parse(b) });
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(status === 200 ? { id: 'em_1' } : { message: 'You can only send testing emails to your own email address' }));
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as { port: number }).port;
+    const env = { ...process.env };
+    Object.assign(process.env, { RESEND_API_KEY: 're_test', RESEND_FROM: 'House Checker <hc@demo.dev>', RESEND_BASE_URL: `http://127.0.0.1:${port}` });
+    try {
+      const { sendEmail } = await import('../../src/server/email');
+      const sent = await sendEmail({ to: ['buyer@realmail.dev'], subject: 's', text: 't', idempotencyKey: 'k1', attachments: [{ filename: 'visit.ics', content: 'BEGIN:VCALENDAR', contentType: 'text/calendar; method=REQUEST' }] });
+      expect(sent).toMatchObject({ ok: true, mode: 'resend', id: 'em_1' });
+      expect(seen[0]).toMatchObject({ auth: 'Bearer re_test', key: 'k1', body: { from: 'House Checker <hc@demo.dev>', to: ['buyer@realmail.dev'] } });
+      expect(Buffer.from(seen[0].body.attachments[0].content, 'base64').toString()).toBe('BEGIN:VCALENDAR');
+      expect(await sendEmail({ to: ['specialist@example.com'], subject: 's', text: 't' })).toMatchObject({ ok: true, mode: 'outbox' });
+      expect(seen.length).toBe(1);
+      status = 403;
+      expect(await sendEmail({ to: ['someone@realmail.dev'], subject: 's', text: 't' })).toMatchObject({ ok: true, mode: 'outbox' });
+      status = 500;
+      expect(await sendEmail({ to: ['someone@realmail.dev'], subject: 's', text: 't' })).toMatchObject({ ok: false, retryable: true });
+    } finally {
+      for (const k of ['RESEND_API_KEY', 'RESEND_FROM', 'RESEND_BASE_URL']) { if (env[k] === undefined) delete process.env[k]; else process.env[k] = env[k]; }
+      server.close();
+    }
+  });
+});

@@ -25,16 +25,22 @@ export function emailMode(): 'resend' | 'outbox' {
   return process.env.RESEND_API_KEY && process.env.RESEND_FROM ? 'resend' : 'outbox';
 }
 
+/** Placeholder domains (RFC 2606) never receive mail; sending there through Resend only bounces. */
+const RESERVED = /@(?:[^@]+\.)?(?:example\.(?:com|org|net)|[^@]+\.(?:test|invalid|example|localhost))$/i;
+
+async function toOutbox(msg: OutgoingEmail, note?: string): Promise<SendResult> {
+  const id = `outbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const dir = path.join(dataDir(), 'outbox');
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `${id}.json`), JSON.stringify({ id, at: new Date().toISOString(), ...(note ? { note } : {}), ...msg }, null, 1));
+  return { ok: true, mode: 'outbox', id };
+}
+
 export async function sendEmail(msg: OutgoingEmail): Promise<SendResult> {
-  if (emailMode() === 'outbox') {
-    const id = `outbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const dir = path.join(dataDir(), 'outbox');
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, `${id}.json`), JSON.stringify({ id, at: new Date().toISOString(), ...msg }, null, 1));
-    return { ok: true, mode: 'outbox', id };
-  }
+  if (emailMode() === 'outbox') return toOutbox(msg);
+  if (msg.to.every((t) => RESERVED.test(t))) return toOutbox(msg, 'placeholder recipient, not sent');
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch(`${process.env.RESEND_BASE_URL || 'https://api.resend.com'}/emails`, {
       method: 'POST',
       signal: AbortSignal.timeout(15_000),
       headers: {
@@ -55,6 +61,9 @@ export async function sendEmail(msg: OutgoingEmail): Promise<SendResult> {
       }),
     });
     const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+    // Resend refuses recipients it may not mail (a test sender can only reach the account owner, an unverified
+    // domain): keep the message in the outbox so the action still completes, labelled as demo.
+    if (res.status === 403 || res.status === 422) return toOutbox(msg, `Resend ${res.status}: ${body.message ?? ''}`.slice(0, 300));
     if (!res.ok) return { ok: false, reason: `Resend ${res.status}: ${body.message ?? ''}`, retryable: res.status >= 500 || res.status === 429 };
     return { ok: true, mode: 'resend', id: body.id ?? 'sent' };
   } catch (e) {
