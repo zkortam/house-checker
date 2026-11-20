@@ -44,7 +44,7 @@
   --shadow-lg: 0 12px 32px rgb(11 11 18 / 0.12);
   --scrim: rgb(0 0 0 / 0.4);
   --success: #22c55e; --warning: #f59e0b; --error: #ef4444; --info: #3b82f6;
-  --success-ink: #15803d; --warning-ink: #b45309; --error-ink: #b91c1c; --info-ink: #1d4ed8;
+  --success-ink: #15803d; --warning-ink: #a14807; --error-ink: #b91c1c; --info-ink: #1d4ed8;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   color-scheme: dark;

@@ -421,3 +421,5 @@ dialog.ovl.sm { }
 .cite-run { white-space: nowrap; }
 .tone-neutral { --tone: var(--text-muted); }
 @media (min-width: 520px) { .mini-grid:has(> :nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Labels on an overlay cell inside a card use the secondary tier: muted drops under 4.5:1 there in dark */
+.verdict-foot .row-title, .cmp-k, .mini .k, .mini .s { color: var(--text-secondary); }
