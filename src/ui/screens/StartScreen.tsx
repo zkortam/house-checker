@@ -19,6 +19,7 @@ export function StartScreen() {
   const [text, setText] = useState('');
   const [packet, setPacket] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggest, setSuggest] = useState<string[]>([]);
   const [errorOn, setErrorOn] = useState<'listing' | 'packet'>('listing');
   const [attachKey, setAttachKey] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -62,6 +63,7 @@ export function StartScreen() {
     const t = raw.trim();
     if (t.length < 4) { setErrorOn('listing'); setError(S.errEmpty); field.current?.focus(); return; }
     setError(null);
+    setSuggest([]);
     let packetFileId: string | undefined;
     if (packet) {
       // Never run silently without a packet the reader added: check it, and stop with a reason if it can't be used.
@@ -78,7 +80,7 @@ export function StartScreen() {
     const r = await startRun(t, { packetFileId, failStep });
     setBusy(false);
     if ('reportId' in r) router.push(`/check/${encodeURIComponent(r.reportId)}`);
-    else { setErrorOn('listing'); setError(errorText(r.error, 'start')); field.current?.focus(); }
+    else { setErrorOn('listing'); setError(errorText(r.error, 'start')); setSuggest(r.error.suggest ?? []); field.current?.focus(); }
   }
 
   return (
@@ -104,6 +106,12 @@ export function StartScreen() {
           </div>
           <div className="prompt-under" aria-live="assertive">
             {error ? <span className="field-error" id="fieldError" role="alert">{error}</span> : null}
+            {error && suggest.length ? (
+              <span className="suggest">
+                {S.closestOnRecord}
+                {suggest.map((a) => <button key={a} type="button" className="pill" onClick={() => { const v = `${a}, San Francisco`; setText(v); run(v); }}>{a}</button>)}
+              </span>
+            ) : null}
           </div>
         </form>
         {recent && recent.length ? (

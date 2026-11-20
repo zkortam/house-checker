@@ -736,3 +736,6 @@ body:has(.page) { background: radial-gradient(circle at 50% 22%, var(--glow), tr
 .aerial figcaption { position: absolute; inset-inline-end: 12px; bottom: 10px; font-size: calc(11px * var(--font-scale)); color: rgb(255 255 255 / 0.85); text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); }
 @media (max-width: 743px) { .aerial { border-radius: 20px; margin-bottom: var(--sp-4); } }
 .page.start .page-title, .page .page-title { font-size: calc(28px * var(--font-scale)); line-height: 1.15; letter-spacing: -0.025em; font-weight: 650; text-align: start; }
+.aerial { margin-top: var(--sp-6); }
+
+.prompt-under .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); color: var(--text-secondary); font-size: 14px; }

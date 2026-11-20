@@ -14,7 +14,7 @@ export const LABELS: Record<FindingLabel, { text: string; tone: Tone; compare: '
   records_differ:        { text: 'Differs from records', tone: 'warning', compare: 'different' },
   records_disagree:      { text: 'City records disagree', tone: 'neutral', compare: 'unknown' },
   open_case:             { text: 'Open city case', tone: 'error', compare: 'different' },
-  likely_stale:          { text: 'Probably outdated', tone: 'warning', compare: 'unknown' },
+  likely_stale:          { text: 'Likely never closed', tone: 'warning', compare: 'unknown' },
   resolved:              { text: 'Fixed', tone: 'success', compare: 'same' },
   not_settled:           { text: "Records don't say", tone: 'neutral', compare: 'unknown' },
 };
