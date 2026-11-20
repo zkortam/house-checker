@@ -69,6 +69,11 @@ Demo video: [submission/demo.mp4](submission/demo.mp4) (2:18). Submission answer
 
 ## Live demo
 
+Hosted: https://house-checker-chi.vercel.app (Vercel). It runs on real city data, with demo addresses served from
+recordings. Sentences there are written by the rule templates (`HC_LLM=off`, since the Claude Code CLI only runs
+locally), reports live in a private Vercel Blob store, and emails go to a demo outbox. The full agent, with Claude
+writing the short answer and reading permits, runs locally:
+
 1. `npm run build && npm run start` with `.env.local` holding `NEXT_PUBLIC_MOCK=0` and `HC_DEMO_RECORDINGS=1`
    (recorded city data for the 6 demo addresses, so DataSF latency can't stall the demo).
 2. Open http://localhost:3000, tap **Try 57 Carmelita St**, then **Check this home**. Walk the verdict, the

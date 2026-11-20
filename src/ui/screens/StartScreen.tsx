@@ -3,17 +3,18 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { FIXTURES } from '@contract/fixtures';
 import { S, fill } from '../strings.en';
-import { U } from '../icons';
-import { Button, ChipButton, FileAttach, Group, IconButton, Textarea } from '../components/ui';
+import { Button, FileAttach, IconButton, Textarea } from '../components/ui';
 import { uploadPacket } from '../api';
 import { startRun } from '../lib/run-store';
 import { errorText } from '../lib/errors';
+import { RecentCards, useRecent } from './RecentScreen';
 import { AppShell } from '../components/AppShell';
 import { track } from '../analytics';
 
 const DRAFT_KEY = 'hc-draft';
 
 export function StartScreen() {
+  const recent = useRecent();
   const router = useRouter();
   const [text, setText] = useState('');
   const [packet, setPacket] = useState<File | null>(null);
@@ -82,34 +83,40 @@ export function StartScreen() {
 
   return (
     <AppShell>
-      <section className="column start" aria-labelledby="startTitle">
-        <div className="answer-head">
-          <h1 id="startTitle">{S.startTitle}</h1>
-          <p className="lead">{S.startLead}</p>
-        </div>
-        <form className="group" noValidate onSubmit={submit}>
-          <div className={`field-wrap${error && errorOn === 'listing' ? ' invalid' : ''}`}>
+      <section className="page start" aria-labelledby="startTitle">
+        <h1 className="page-title" id="startTitle">{S.startTitle}</h1>
+        <form noValidate onSubmit={submit} className="prompt-form">
+          <div className={`prompt${error && errorOn === 'listing' ? ' invalid' : ''}`}>
             <label htmlFor="listing" className="sr-only">{S.listingLabel}</label>
             <Textarea ref={field} variant="field" id="listing" name="listing" placeholder={S.listingPlaceholder} value={text}
-              autoComplete="street-address" autoCapitalize="sentences" spellCheck={false} enterKeyHint="go"
-              aria-invalid={(!!error && errorOn === 'listing') || undefined} aria-describedby={error && errorOn === 'listing' ? 'fieldError' : undefined}
+              autoComplete="street-address" autoCapitalize="sentences" spellCheck={false} enterKeyHint="go" autoFocus
+              aria-invalid={(!!error && errorOn === 'listing') || undefined} aria-describedby={error ? 'fieldError' : undefined}
               onChange={(e) => update(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e); }} />
-            <div className="field-foot">
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !text.includes('\n')) { e.preventDefault(); submit(e); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e); }} />
+            <div className="prompt-foot">
               <span className="attach-wrap">
-                <FileAttach key={attachKey} label={packet ? packet.name : S.addPacket} onFile={(f) => { setPacket(f); if (errorOn === 'packet') setError(null); }} />
+                <FileAttach key={attachKey} label={packet ? packet.name : S.disclosuresWord} onFile={(f) => { setPacket(f); if (errorOn === 'packet') setError(null); }} />
                 {packet ? <IconButton small icon="close" label={fill(S.removePacket, { name: packet.name })}
                   onClick={() => { setPacket(null); setAttachKey((k) => k + 1); if (errorOn === 'packet') setError(null); }} /> : null}
               </span>
               <Button kind="primary" type="submit" className="btn-fixed" aria-busy={busy || undefined}>{S.checkButton}</Button>
             </div>
           </div>
-          <div className="field-error" id="fieldError" role="alert" aria-live="assertive">{error}</div>
-          <div className="chips" role="group" aria-label={S.examplesLabel}>
-            <ChipButton onClick={() => fillExample('2055-42nd-ave')}>{S.example2055}</ChipButton>
-            <ChipButton onClick={() => fillExample('57-carmelita-st')}>{S.example57}</ChipButton>
+          <div className="prompt-under" aria-live="assertive">
+            {error ? <span className="field-error" id="fieldError" role="alert">{error}</span> : (
+              <span className="examples" role="group" aria-label={S.examplesLabel}>
+                <button type="button" className="text-action" onClick={() => fillExample('2055-42nd-ave')}>{S.example2055}</button>
+                <button type="button" className="text-action" onClick={() => fillExample('57-carmelita-st')}>{S.example57}</button>
+              </span>
+            )}
           </div>
         </form>
+        {recent && recent.length ? (
+          <section aria-labelledby="recentHead" className="start-recent">
+            <h2 className="section-head" id="recentHead">{S.recentTitle}</h2>
+            <RecentCards items={recent.slice(0, 4)} />
+          </section>
+        ) : null}
       </section>
     </AppShell>
   );

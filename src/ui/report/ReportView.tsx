@@ -11,6 +11,7 @@ import {
   ActionLog, Cases, CostsView, Hazards, History, InfoList, Packet, SectionBody, Sources, type AskAction,
 } from './sections';
 import { BookFlow, EmailDialog } from './actions';
+import { ShareButton } from '../components/AppShell';
 import { track } from '../analytics';
 import { packetOf } from './packet-types';
 
@@ -96,6 +97,7 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
 
         <footer className="rv-foot">
           <div className="pills">
+            <ShareButton />
             <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
               {fill(S.sourcesN, { n: report.sources.length })}
             </Pressable>

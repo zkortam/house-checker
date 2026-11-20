@@ -9,6 +9,7 @@ import { getReport } from '../api';
 import { startRun, useRun } from '../lib/run-store';
 import { errorText } from '../lib/errors';
 import { partialDate } from '../lib/format';
+import { addRecent } from '../lib/recent';
 import { ReportView } from '../report/ReportView';
 import { Verdict, stepsSummary } from '../report/sections';
 import { Hero } from '../report/ReportView';
@@ -61,6 +62,7 @@ export function CheckScreen({ id }: { id: string }) {
     shownFor.current = report.id;
     const failed = Object.values(report.sections).filter((x) => x.state === 'error').length;
     track('report_shown', { decision: report.decision.tone, failedSections: failed, live: !!live });
+    addRecent({ id: report.id, address: report.address, title: report.decision.title, tone: report.decision.tone, at: report.checkedAt });
   }, [report, live]);
 
   const streaming = !!live && live.status === 'running';
@@ -70,7 +72,7 @@ export function CheckScreen({ id }: { id: string }) {
   return (
     <AppShell back title={address ?? undefined} share={!!report}>
       <SourceProvider value={openSource}>
-        <section className={`column${report ? ' wide' : ''}`} aria-labelledby="reportTitle">
+        <section className={`column${report ? ' wide' : ''}`} aria-labelledby="reportTitle" style={{ paddingTop: 24 }}>
           {report ? null : <div className="answer-head">
             <h1 id="reportTitle">{address ?? (fetchError ? S.appName : S.stepsTitle)}</h1>
           </div>}
