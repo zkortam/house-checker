@@ -137,7 +137,9 @@ export function buildReport(input: RuleInput): Report {
   const aduIsSecondUnit = listingUnits == null && !!claims.adu && !unitLegalized && (recordUnits ?? rollUnits ?? 1) === 2;
 
   // Units
-  if (listingUnits != null || claims.adu) {
+  // A condo listing that says "1 unit" describes the unit itself, not the building: nothing to compare.
+  const condoSelf = multiParcel && !!addr.unit && listingUnits === 1 && !claims.adu;
+  if (!condoSelf && (listingUnits != null || claims.adu)) {
     const lu = listingUnits ?? 1;
     const adu = claims.adu;
     if (lastUnitPermit && recordUnits != null && lu === recordUnits) {
@@ -347,7 +349,7 @@ export function buildReport(input: RuleInput): Report {
   }
   // Sort ledger by severity so problems come first.
   const sev: Record<FindingLabel, number> = { open_case: 0, no_permit_found: 1, records_differ: 2, permitted_not_finaled: 3, records_disagree: 4, likely_stale: 5, not_settled: 6, permitted_not_updated: 7, resolved: 8, matches_planning: 9, matches: 10 };
-  for (const r of ledger) { if (r.records) r.records = fit14(r.records); if (r.listing) r.listing = fit14(r.listing); }
+  for (const r of ledger) { if (r.records) r.records = fit14(r.records); if (r.listing) r.listing = fit14(r.listing); r.why = r.why.replace(/ +([.,;:])/g, '$1'); }
   if (ledger.some((r) => sev[r.label] <= 3)) ledger.sort((a, b) => sev[a.label] - sev[b.label]);
 
   /* ----- systems ----- */
