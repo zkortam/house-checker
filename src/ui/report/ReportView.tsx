@@ -1,11 +1,11 @@
 'use client';
 import { useMemo, useState, type ReactNode } from 'react';
 import type { ActionLogEntry, ClaimRow, Costs, GlanceTile, HazardCheck, HistoryRow, Report, SectionKey, SystemRow, Unknown } from '@contract/types';
-import { EMPTY_VALUE, HAZARD_STATUS, HISTORY_LEGEND, HISTORY_TONE, LABELS, SYSTEM_STATUS, DECISION_TONE } from '@contract/labels';
+import { HAZARD_STATUS, HISTORY_TONE, LABELS, SYSTEM_STATUS, DECISION_TONE } from '@contract/labels';
 import { computeCosts } from '@contract/money';
 import { S, fill } from '../strings.en';
 import { G, U } from '../icons';
-import { Button, Cited, Dialog, LabelChip, MetaLine, Pressable, Slider, useToast } from '../components/ui';
+import { Button, Cited, Dialog, Pressable, Slider, useToast } from '../components/ui';
 import { money, partialDate, plural } from '../lib/format';
 import {
   ActionLog, Cases, CostsView, Hazards, History, InfoList, Packet, SectionBody, Sources, type AskAction,
@@ -88,7 +88,7 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
             onOpen={() => open(S.historyTitle, <History rows={report.history} />, 'history')} /> : null}
           {packet && packet.findings.length ? (
             <Pressable className="b-card span-4 pk-tile" onClick={() => open(S.packetTitle, <Packet packet={packet} />, 'packet')}>
-              <span className="b-label"><G glyph="packet" />{S.packetTitle}</span>
+              <span className="b-label">{S.packetTitle}</span>
               <span className="b-big">{packet.findings.length}<small> {plural(packet.findings.length, S.packetFindingsOne, S.packetFindings).replace(/^\d+\s*/, '')}</small></span>
             </Pressable>
           ) : null}
@@ -97,15 +97,15 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
         <footer className="rv-foot">
           <div className="pills">
             <button type="button" className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
-              <U name="external" />{fill(S.sourcesN, { n: report.sources.length })}
+              {fill(S.sourcesN, { n: report.sources.length })}
             </button>
             {log.length ? (
               <button type="button" className="pill" onClick={() => open(S.actionsTitle, <ActionLog entries={log} />)}>
-                <U name="done" />{fill(S.sentN, { n: log.length })}
+                {fill(S.sentN, { n: log.length })}
               </button>
             ) : null}
           </div>
-          <p className="fineprint">{S.disclaimer}</p>
+          <p className="fineprint">{report.answerBy === 'rules' ? S.writtenByRules : S.writtenByAi}. {S.disclaimer}</p>
         </footer>
       </div>
 
@@ -125,15 +125,9 @@ export function Hero({ report, answer }: { report: Report; answer: string }) {
   return (
     <header className={`hero tone-${tone}`}>
       <div className="hero-main">
-        <MetaLine items={[report.meta.neighborhood, report.meta.yearBuilt ? fill(S.built, { value: report.meta.yearBuilt }) : null,
-          report.meta.zoning, fill(S.parcel, { value: report.parcelDisplay })]} />
         <h1 className="hero-addr" id="reportTitle">{report.address}</h1>
-        <p className="hero-verdict"><span className="halo" aria-hidden="true" />{report.decision.title}</p>
-        <p className="hero-answer"><Cited text={answer} /></p>
-        <p className="hero-insp"><G glyph="permit" /><span><Cited text={report.decision.inspection} /></span></p>
-        {report.answerBy === 'rules'
-          ? <p className="disclosure"><U name="info" className="ai-g" />{S.writtenByRules}</p>
-          : <p className="disclosure"><U name="ai" className="ai-g" />{S.writtenByAi}</p>}
+        <p className="hero-verdict">{report.decision.title}</p>
+        <p className="hero-answer">{answer.replace(/\s*\[\d+\]/g, '')}</p>
       </div>
       <Ring rows={report.ledger} />
     </header>
@@ -182,9 +176,9 @@ function ClaimsCard({ rows, onOpen }: { rows: ClaimRow[]; onOpen: (r: ClaimRow) 
         return (
           <Pressable key={r.key + r.title} className={`claim tone-${l.tone}`} onClick={() => onOpen(r)} aria-label={`${r.title}: ${l.text}`}>
             <span className="claim-t">{r.title}</span>
-            <span className="claim-v">{r.listing ?? EMPTY_VALUE}</span>
+            <span className={`claim-v${r.listing ? '' : ' none'}`}>{r.listing ?? S.noRecord}</span>
             <span className="claim-ic"><U name={COMPARE_ICON[l.compare]} /></span>
-            <span className="claim-v">{r.records ?? EMPTY_VALUE}</span>
+            <span className={`claim-v${r.records ? '' : ' none'}`}>{r.records ?? S.noRecord}</span>
           </Pressable>
         );
       })}
@@ -197,11 +191,10 @@ function ClaimDetail({ row }: { row: ClaimRow }) {
   return (
     <div className="claim-detail">
       <div className={`cd-pair tone-${l.tone}`}>
-        <div><span className="b-label">{S.compareListing}</span><span className="cd-v">{row.listing ?? EMPTY_VALUE}</span></div>
+        <div><span className="b-label">{S.compareListing}</span><span className="cd-v">{row.listing ?? S.noRecord}</span></div>
         <span className="claim-ic lg"><U name={COMPARE_ICON[l.compare]} /></span>
-        <div><span className="b-label">{S.compareCity}</span><span className="cd-v">{row.records ?? EMPTY_VALUE}</span></div>
+        <div><span className="b-label">{S.compareCity}</span><span className="cd-v">{row.records ?? S.noRecord}</span></div>
       </div>
-      <LabelChip label={row.label} />
       <p className="sheet-text"><Cited text={row.why} /></p>
     </div>
   );
@@ -210,24 +203,16 @@ function ClaimDetail({ row }: { row: ClaimRow }) {
 function TaxCard({ costs, price, setPrice, onHow }: { costs: Costs; price: number; setPrice: (n: number) => void; onHow: () => void }) {
   const rows = useMemo(() => (price === costs.price ? costs.rows : computeCosts(price, costs.inputs)), [price, costs]);
   const tax = rows.find((r) => r.kind === 'property_tax');
-  const supp = rows.find((r) => r.kind === 'supplemental_tax');
-  const transfer = rows.find((r) => r.kind === 'transfer_tax');
-  const fees = rows.find((r) => r.kind === 'case_fees');
   const monthly = tax?.amount == null ? null : Math.round(tax.amount / 12);
   const min = Math.round((costs.price * 0.8) / 5000) * 5000;
   const max = Math.round((costs.price * 1.2) / 5000) * 5000;
   return (
     <div className="b-card span-2 tax">
-      <span className="b-label"><G glyph="money" />{S.taxPerMonth}</span>
+      <span className="b-label">{S.taxPerMonth}</span>
       <span className="b-huge num" aria-live="polite">{money(monthly)}<small>{S.perMonth}</small></span>
       <div className="tax-slider">
         <Slider id="hc-price" min={min} max={max} step={5000} value={price} onChange={setPrice} label={S.priceLabel} />
-        <span className="tax-price num">{S.priceLabel} {money(price)}</span>
-      </div>
-      <div className="tax-minis">
-        {supp ? <span><b className="num">{money(supp.amount)}</b>{S.supplementalShort}</span> : null}
-        {transfer ? <span><b className="num">{money(transfer.amount)}</b>{S.transferShort}</span> : null}
-        {fees ? <span className="tone-error"><b className="num ink">{money(fees.amount)} {S.perMonth}</b>{S.caseFeesShort}</span> : null}
+        <span className="tax-price num">{money(price)}</span>
       </div>
       <button type="button" className="b-link" onClick={onHow}>{S.howWorkedOut}<U name="caret" className="rot" /></button>
     </div>
@@ -237,9 +222,9 @@ function TaxCard({ costs, price, setPrice, onHow }: { costs: Costs; price: numbe
 function StatTile({ t, onOpen }: { t: GlanceTile; onOpen: () => void }) {
   return (
     <Pressable className={`b-card stat tone-${t.tone}`} onClick={onOpen}>
-      <span className="b-label"><G glyph={t.glyph} />{t.label}</span>
-      <span className="b-big">{t.value ?? EMPTY_VALUE}</span>
-      <span className="b-status"><span className="dot" aria-hidden="true" />{t.status}</span>
+      <span className="b-label">{t.label}</span>
+      <span className="b-big">{t.value ?? S.noRecord}</span>
+      <span className="b-status">{t.status}</span>
     </Pressable>
   );
 }
@@ -247,11 +232,11 @@ function StatTile({ t, onOpen }: { t: GlanceTile; onOpen: () => void }) {
 function HazardTile({ t, rows, onOpen }: { t: GlanceTile; rows: HazardCheck[]; onOpen: () => void }) {
   return (
     <Pressable className={`b-card stat tone-${t.tone}`} onClick={onOpen}>
-      <span className="b-label"><G glyph={t.glyph} />{t.label}</span>
+      <span className="b-label">{t.label}</span>
       <span className="hz-dots" aria-hidden="true">
         {rows.map((h) => <span key={h.key} className={`hz-dot tone-${HAZARD_STATUS[h.status].tone}`} title={h.title} />)}
       </span>
-      <span className="b-status"><span className="dot" aria-hidden="true" />{t.value ? `${t.value} · ` : ''}{t.status}</span>
+      <span className="b-status">{t.status}</span>
     </Pressable>
   );
 }
@@ -284,10 +269,9 @@ function AskRow({ unknowns, log, onAction, onOpen }: {
           const label = g.key === 'listing_agent' ? S.actionEmailAgent : g.key === 'city' ? S.actionEmailCity : g.key === 'specialist' ? S.actionBook : S.actionBrief;
           const button = sent
             ? <p className="done-line"><U name="done" />{sent.kind === 'book_specialist' ? S.requestSentLine : S.emailSentLine}</p>
-            : <Button kind="primary" icon={g.icon === 'city' ? 'email' : g.icon} onClick={() => onAction(act())}>{label}</Button>;
+            : <Button kind="primary" onClick={() => onAction(act())}>{label}</Button>;
           return (
             <div key={g.key} className="ask-card">
-              <span className="ask-ic" aria-hidden="true"><U name={g.icon} /></span>
               <span className="ask-who">{g.title}</span>
               <span className="ask-q">{g.items[0].title}</span>
               <button type="button" className="b-link" onClick={() => onOpen(g.title, g.items, button)}>
@@ -317,15 +301,15 @@ function Highlight({ kind, lines, onAll }: { kind: 'good' | 'watch'; lines: stri
   if (!lines.length) return null;
   const tone = kind === 'good' ? 'success' : 'warning';
   return (
-    <div className={`b-card span-2 hl-card tone-${tone}`}>
-      <span className="b-label ink"><U name={kind === 'good' ? 'same' : 'watch'} />{kind === 'good' ? S.goodNews : S.worthALook}</span>
-      <HlList lines={lines.slice(0, 3)} kind={kind} />
-      {lines.length > 3 ? <button type="button" className="b-link" onClick={onAll}>{fill(S.showAllN, { n: lines.length })}<U name="caret" className="rot" /></button> : null}
-    </div>
+    <Pressable className={`b-card span-2 hl-card tone-${tone}`} onClick={onAll}>
+      <span className="b-label">{kind === 'good' ? S.goodNews : S.worthALook}</span>
+      <ul className="hl-list">{lines.slice(0, 3).map((t, i) => <li key={i}>{t.replace(/\s*\[\d+\]/g, '')}</li>)}</ul>
+      {lines.length > 3 ? <span className="b-link">{fill(S.showAllN, { n: lines.length })}</span> : null}
+    </Pressable>
   );
 }
 function HlList({ lines, kind }: { lines: string[]; kind: 'good' | 'watch' }) {
-  return <ul className={`hl-list tone-${kind === 'good' ? 'success' : 'warning'}`}>{lines.map((t, i) => <li key={i}><span className="dot" aria-hidden="true" /><span><Cited text={t} /></span></li>)}</ul>;
+  return <ul className={`hl-list sheet tone-${kind === 'good' ? 'success' : 'warning'}`}>{lines.map((t, i) => <li key={i}><Cited text={t} /></li>)}</ul>;
 }
 
 /* ---------- The bones: each system on one age axis ---------- */
@@ -342,11 +326,11 @@ function BonesCard({ rows, built, onOpen }: { rows: SystemRow[]; built: number |
           const pct = r.year ? ((r.year - from) / Math.max(now - from, 1)) * 100 : null;
           return (
             <Pressable key={i} className={`bone tone-${st.tone}`} onClick={() => onOpen(r)} aria-label={`${r.title}: ${r.year ?? st.text}`}>
-              <span className="bone-t"><G glyph={r.glyph} />{r.title}</span>
+              <span className="bone-t">{r.title}</span>
               <span className="bone-track" aria-hidden="true">
                 {pct != null ? <><span className="bone-fill" style={{ width: `${pct}%` }} /><span className="bone-dot" style={{ left: `${pct}%` }} /></> : <span className="bone-none" />}
               </span>
-              <span className="bone-y num">{r.year ?? EMPTY_VALUE}</span>
+              <span className="bone-y num">{r.year ?? ''}</span>
             </Pressable>
           );
         })}
@@ -363,21 +347,16 @@ function TimelineCard({ rows, onOpen }: { rows: HistoryRow[]; onOpen: () => void
   const now = new Date().getFullYear() + 1;
   const ys = rows.map((r) => yr(r.date));
   const from = Math.floor(Math.min(...ys, now - 12)) - 1;
-  const kinds = Array.from(new Set(rows.map((r) => r.kind)));
-  const last = rows[rows.length - 1];
   return (
     <Pressable className="b-card span-2 tline" onClick={onOpen}>
       <span className="b-label">{S.timelineTitle}</span>
-      <span className="tl-axis" aria-hidden="true">
+      <span className="b-big">{rows.length}<small>{fill(S.recordsSince, { year: rows[0].date.slice(0, 4) })}</small></span>
+      <span className="tl-axis" aria-hidden="true" style={{ marginTop: 'auto' }}>
         {rows.map((r, i) => (
           <span key={i} className={`tl-pin tone-${HISTORY_TONE[r.kind]}`} style={{ left: `${((yr(r.date) - from) / (now - from)) * 100}%` }} />
         ))}
       </span>
       <span className="axis num" aria-hidden="true"><span>{from}</span><span>{now - 1}</span></span>
-      <span className="tl-last"><span className="num">{partialDate(last.date)}</span> {last.text.replace(/\s*\[\d+\]/g, '')}</span>
-      <span className="legend" aria-hidden="true">
-        {kinds.map((k) => <span key={k} className={`tone-${HISTORY_TONE[k]}`}><span className="dot" />{HISTORY_LEGEND[k]}</span>)}
-      </span>
     </Pressable>
   );
 }
