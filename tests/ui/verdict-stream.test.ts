@@ -12,7 +12,7 @@ describe('Verdict while streaming', () => {
   });
   it('says fixed rules when answerBy is rules, AI otherwise', () => {
     const r = FIXTURES[0].report;
-    expect(renderToStaticMarkup(createElement(Verdict, { report: { ...r, answerBy: 'rules' } as typeof r, answer: '', streaming: false }))).toContain('fixed rules');
+    expect(renderToStaticMarkup(createElement(Verdict, { report: { ...r, answerBy: 'rules' }, answer: '', streaming: false }))).toContain('fixed rules');
     expect(renderToStaticMarkup(createElement(Verdict, { report: r, answer: '', streaming: false }))).toContain('Written by AI');
   });
 });
