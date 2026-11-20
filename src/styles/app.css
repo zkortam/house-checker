@@ -460,3 +460,5 @@ dialog.ovl.sm { }
 .pk-v { font-size: var(--text-body); line-height: var(--lh-body); font-weight: var(--w-medium); }
 .cmp-row[aria-expanded="true"] .more { color: var(--text-secondary); }
 html { scroll-padding-top: calc(var(--header-row) + 8px); scroll-padding-bottom: 8px; }
+.attach-wrap { display: inline-flex; align-items: center; min-width: 0; }
+.attach-wrap .attach span { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
