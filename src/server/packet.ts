@@ -132,7 +132,12 @@ export function reconcilePacket(report: Report, facts: PacketFact[], packetId: s
     const val = f.topic === 'sqft' ? f.value.toLocaleString('en-US') : String(f.value);
     let label: FindingLabel = 'not_settled';
     if (recNum != null && Number.isFinite(recNum) && recNum > 0) label = (f.topic === 'sqft' ? Math.abs(recNum - f.value) / recNum <= 0.1 : recNum === f.value) ? 'matches' : 'records_differ';
-    const why = `The packet states ${f.statement.replace(/[.!]+$/, '').replace(/—/g, ',')} ${cite(f.page)}.${ledger ? ` City records show ${ledger.records ?? 'nothing on this'}${ledger.why.match(/\[\d+\]/)?.[0] ? ' ' + ledger.why.match(/\[\d+\]/)![0] : ''}.` : ''}`;
+    const said = f.statement.replace(/[.!]+$/, '').replace(/—/g, ',').trim();
+    // "Seller questionnaire says ..." already names who said it; otherwise lead with the packet.
+    const lead = /\b(says|states|reports|notes|lists|shows|describes|discloses)\b/i.test(said) ? said[0].toUpperCase() + said.slice(1) : `The packet states ${said}`;
+    const ref = ledger?.why.match(/\[\d+\]/)?.[0];
+    const city = !ledger ? '' : ledger.records ? ` City records show ${ledger.records}${ref ? ' ' + ref : ''}.` : ` City records give no count${ref ? ' ' + ref : ''}.`;
+    const why = `${lead} ${cite(f.page)}.${city}`;
     if (checkCopy(why).length) continue;
     const statement = f.statement.replace(/—/g, ',').slice(0, 90);
     if (!checkCopy(statement).length) findings.push({ doc: docOf(pages[f.page - 1] ?? ''), topic: f.topic, statement, page: f.page, label, records: ledger?.records ?? null, text: why });
