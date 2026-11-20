@@ -28,8 +28,12 @@ function title(s: string): string {
 const TYPELESS_RE = /\b(\d{1,5})([A-Za-z])?\s+((?:[A-Za-z][A-Za-z'.]*)(?:\s+[A-Za-z][A-Za-z'.]*){0,4}?)\s*,?\s*(?:#\s*[A-Za-z0-9-]{1,6}\s*,?\s*)?(?:San Francisco|SF|S\.F\.)\b/i;
 const NOT_STREET = /^(bed|beds|bedroom|bedrooms|bath|baths|bathroom|bathrooms|br|ba|bd|unit|units|sq|sqft|ft|car|cars|story|stories|years?|homes?|condos?|flats?)\b/i;
 
+// Listing prose that looks like an address: "5 min walk", "10 minute drive", "2 car parking lane", "1 block to the Way".
+const PROSE_WORD = /\b(min|mins|minutes?|mile|blocks?|cars?|garage|parking|beds?|bedrooms?|baths?|bathrooms?|stor(?:y|ies)|units?|steps?|to|and|from|in|on|at|by|with|for|private|walking|quick|sq|ft)\b/i;
+const ADDRESS_RE_G = new RegExp(ADDRESS_RE.source, 'gi');
+
 export function parseAddress(text: string): ParsedAddress | null {
-  let m: RegExpMatchArray | null = text.match(ADDRESS_RE);
+  let m: RegExpMatchArray | null = [...text.matchAll(ADDRESS_RE_G)].find((x) => !PROSE_WORD.test(x[3])) ?? null;
   if (!m) {
     const t = text.match(TYPELESS_RE);
     if (!t || NOT_STREET.test(t[3])) return null;

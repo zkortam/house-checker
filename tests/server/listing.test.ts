@@ -118,3 +118,12 @@ describe('other cities vs SF streets that share their names', () => {
       expect(await readListing(t)).toEqual({ ok: false, kind: 'outside_sf' });
   });
 });
+
+describe('listing prose that looks like an address', () => {
+  it('skips "5 min walk" and "10 minute drive" for the real address', () => {
+    expect(parseAddress('Sunny home, 5 min walk to BART. 600 Clement St, SF')?.display).toBe('600 Clement St');
+    expect(parseAddress('Just a 10 minute drive to downtown! 600 Clement St')?.display).toBe('600 Clement St');
+    expect(parseAddress('Laundry in unit, 2 car parking lane. 600 Clement St')?.display).toBe('600 Clement St');
+    expect(parseAddress('12 Miles St, SF')?.display).toBe('12 Miles St');
+  });
+});
