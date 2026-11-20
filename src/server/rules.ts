@@ -551,6 +551,13 @@ export function buildReport(input: RuleInput): Report {
       : { section: 'upside', glyph: 'zoning', label: 'Room to grow', value: zoning, tone: 'info', status: historic ? 'Historic district' : zoning && /^RH-[23]|^RM/.test(zoning) ? 'More units allowed' : 'Zoning' },
   ];
 
+  // A source that could not be read never shows as a clean result on the tiles.
+  const notChecked = (i: number) => { glance[i] = { ...glance[i], value: null, tone: 'neutral', status: 'Not checked' }; };
+  if (failed.has('complaints')) notChecked(1);
+  if (failed.has('tenants')) notChecked(3);
+  if (failed.has('hazards') || !hazards.length) notChecked(4);
+  if (failed.has('permits') && !multiParcel) { glance[0] = { ...glance[0], tone: 'neutral', status: 'Permits not checked' }; }
+
   /* ----- highlights ----- */
   const good: string[] = [];
   const watch: string[] = [];
@@ -642,7 +649,10 @@ export function buildReport(input: RuleInput): Report {
   };
 
   /* ----- answer and drafts (rule sentences; writer.ts may improve them) ----- */
-  const answer = ruleAnswer({ multiParcel, unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
+  const missed = (['permits', 'complaints', 'planning'] as const).filter((k) => failed.has(k));
+  const answerBase = ruleAnswer({ multiParcel, unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
+  const missedNote = missed.length ? ` ${missed.map((k) => ({ permits: 'Building permits', complaints: 'City complaints', planning: 'Planning records' })[k]).join(' and ')} couldn't be read this time.` : '';
+  const answer = (answerBase + missedNote).length <= 220 ? answerBase + missedNote : answerBase;
   const drafts = ruleDrafts({ addr, unknowns, cases, openPlanning, lastUnitPermit, unitCfc, agentEmail: input.agentEmail, permits, ledger, active });
 
   return {

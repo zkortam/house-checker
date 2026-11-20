@@ -4,7 +4,7 @@ import { parseAddress, parcelDisplay, resolveAddress, type ResolvedAddress } fro
 import { readListing } from './listing';
 import { buildReport, fmtDate, type StepKey } from './rules';
 import { fetchers, type Raw } from './sources';
-import { saveReport } from './store';
+import { saveReport, trackRun } from './store';
 import { writeProse } from './writer';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
@@ -69,6 +69,19 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   if (!addr || !addr.parcels.length) return fail({ kind: 'not_found', retryable: false, field: 'listingText', debug: `no parcel for ${parsed.display}` });
 
   const reportId = opts.reportId ?? newReportId(addr.display);
+  let settle: (r: Report | null) => void = () => {};
+  if (opts.save !== false) trackRun(reportId, new Promise<Report | null>((r) => { settle = r; }));
+  try {
+    const report = await finishRun(reportId, addr, listing, listingText, emit, opts);
+    settle(report);
+    return report;
+  } catch (e) {
+    settle(null);
+    throw e;
+  }
+}
+
+async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extract<Awaited<ReturnType<typeof readListing>>, { ok: true }>, listingText: string, emit: Emit, opts: RunOpts): Promise<Report> {
   await emit({ type: 'run', runId: `run-${randomBytes(4).toString('hex')}`, reportId, address: addr.display });
 
   const packet = opts.packetFileId ? await loadPacket(opts.packetFileId) : null;
