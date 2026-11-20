@@ -25,17 +25,24 @@ export function readListingRegex(text: string): ListingClaims {
   const t = text.replace(/ /g, ' ');
   const addr = parseAddress(t);
   let price: number | null = null;
-  const pm = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i) ?? t.match(/\$\s?([\d,.]+)\s*(m|million|k)?\b/i)
-    ?? t.match(/(?:offered at|asking|list price|priced at)\s*([\d,.]+)\s*(m|million|k)\b/i); // "asking 799k", no dollar sign
-  if (pm) {
-    const base = num(pm[1]);
-    const mult = pm[2] ? (/^m/i.test(pm[2]) ? 1_000_000 : 1_000) : 1;
-    price = base != null ? Math.round(base * mult) : null;
-    if (price != null && price < 10_000) price = null;
+  const toPrice = (n: string, unit?: string) => { const base = num(n); return base == null ? null : Math.round(base * (unit ? (/^m/i.test(unit) ? 1_000_000 : 1_000) : 1)); };
+  // A labelled price first ("Offered at $1,595,000", "asking 799k"); otherwise the largest dollar amount that isn't
+  // per month or per year (HOA dues, "Est. $8,912/mo").
+  const labelled = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i)
+    ?? t.match(/(?:offered at|asking|list price|priced at)\s*([\d,.]+)\s*(m|million|k)\b/i);
+  if (labelled) price = toPrice(labelled[1], labelled[2]);
+  if (price == null || price < 10_000) {
+    price = null;
+    for (const m of t.matchAll(/\$\s?([\d,.]+)\s*(m|million|k)?\b(?!\s*(?:\/|per|a)\s*(?:mo|month|yr|year))/gi)) {
+      const v = toPrice(m[1], m[2]);
+      if (v != null && v >= 10_000 && (price == null || v > price)) price = v;
+    }
   }
   const beds = t.match(/(\d+(?:\.\d+)?)\s*(?:bed(?:room)?s?|br|bd)\b/i);
   const baths = t.match(/(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b/i);
-  const sqft = t.match(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)/i);
+  // Living area, not the lot: skip a match with "lot" just before it or right after it.
+  const sqft = [...t.matchAll(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)\.?/gi)]
+    .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^\s*(?:\w+\s+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
   const units = t.match(/\b(\d+|two|three|four|five|six)[- ]units?\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
   let adu: ListingClaims['adu'] = null;
   if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|junior adu|jadu)/i.test(t)) adu = 'legal';

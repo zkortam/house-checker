@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile, rename, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { get as blobGet, put as blobPut } from '@vercel/blob';
 import type { ActionLogEntry, Report } from '../contract/types';
 
@@ -28,7 +29,10 @@ export async function blobPutJson(pathname: string, value: unknown): Promise<voi
 const blobRead = (id: string) => blobGetJson<Report>(blobPath(id));
 const blobWrite = (report: Report) => blobPutJson(blobPath(report.id), report);
 
-export function dataDir(): string { return process.env.HC_DATA_DIR ?? path.join(process.cwd(), '.data'); }
+/** Where JSON state lives. On Vercel the app directory is read-only, so the default there is the temp dir. */
+export function dataDir(): string {
+  return process.env.HC_DATA_DIR ?? (process.env.VERCEL ? path.join(tmpdir(), 'hc-data') : path.join(process.cwd(), '.data'));
+}
 
 const safe = (id: string) => id.replace(/[^a-zA-Z0-9._-]/g, '_');
 
@@ -44,7 +48,12 @@ export async function readJson<T>(file: string): Promise<T | null> {
 }
 
 export async function saveReport(report: Report): Promise<void> {
-  await writeAtomic(path.join(dataDir(), 'reports', safe(report.id) + '.json'), JSON.stringify(report, null, 1));
+  try {
+    await writeAtomic(path.join(dataDir(), 'reports', safe(report.id) + '.json'), JSON.stringify(report, null, 1));
+  } catch (e) {
+    if (!blobOn()) throw e; // with Blob on, the shared store is the one that matters
+    console.error('local report write failed', report.id, (e as Error).message);
+  }
   if (blobOn()) { try { await blobWrite(report); } catch (e) { console.error('blob write failed', report.id, e); } }
 }
 
@@ -96,6 +105,10 @@ const inflight: Inflight = (g.__hcInflight ??= new Map());
 
 export function trackRun(id: string, p: Promise<Report | null>): void {
   inflight.set(id, p);
+  // On Vercel a refresh can land on another instance: a small marker in Blob says this run is still going.
+  if (blobOn()) void blobPut(`runs/${safe(id)}.json`, JSON.stringify({ id, at: new Date().toISOString() }), {
+    access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json',
+  }).catch(() => undefined);
   p.finally(() => { if (inflight.get(id) === p) inflight.delete(id); }).catch(() => undefined);
 }
 
@@ -104,7 +117,19 @@ export async function getReportOrWait(id: string, waitMs = 90_000): Promise<Repo
   const stored = await getReport(id);
   if (stored) return stored;
   const run = inflight.get(id);
-  if (!run) return null;
+  if (!run) {
+    if (!blobOn()) return null;
+    // Another instance may be running it: wait for the report while its marker exists (at most waitMs).
+    let marker = false;
+    try { const m = await blobGet(`runs/${safe(id)}.json`, { access: 'private', useCache: false }); marker = !!m && m.statusCode === 200; } catch { /* no marker */ }
+    if (!marker) return null;
+    for (const end = Date.now() + waitMs; Date.now() < end;) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const r = await getReport(id);
+      if (r) return r;
+    }
+    return null;
+  }
   const done = await Promise.race([run.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), waitMs))]);
   return done ?? (await getReport(id));
 }

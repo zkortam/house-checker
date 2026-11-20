@@ -45,6 +45,8 @@ const int = (x: number) => new Intl.NumberFormat('en-US').format(Math.round(x));
 const money = (x: number) => '$' + int(x);
 const WORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 const word = (x: number) => WORD[x] ?? String(x);
+/** Ledger cells hold at most 14 characters: "245,700 to 295,521" becomes "246k to 296k". */
+const fit14 = (t: string) => (t.length <= 14 ? t : t.replace(/\d{1,3}(?:,\d{3})+/g, (m) => `${Math.round(Number(m.replace(/,/g, '')) / 1000)}k`));
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const lower = (s?: string) => (s ?? '').toLowerCase();
 const isComplete = (p: Row) => /complete|finaled/i.test(p.status ?? '') || (!!p.completed_date && !/cancel|withdraw|expired/i.test(p.status ?? ''));
@@ -209,7 +211,7 @@ export function buildReport(input: RuleInput): Report {
         why: `Planning approved the ${/adu/i.test(proj!.description ?? '') ? 'ADU ' : ''}project at ${int(projArea)} sq ft of floor area${n(proj!.residential_exist) ? `, up from ${int(n(proj!.residential_exist)!)}` : ''} ${c(projSrc)}.${rollArea ? ` The assessor's ${int(rollArea)} predates the work ${c(rollSrc)}.` : ''}` };
     } else if (projArea && rollArea && !near(rollArea, projArea)) {
       const lo = Math.min(rollArea, projArea), hi = Math.max(rollArea, projArea);
-      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: `${int(lo)} to ${int(hi)}`, label: 'records_disagree',
+      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: fit14(`${int(lo)} to ${int(hi)}`), label: 'records_disagree',
         why: `The assessor records ${int(rollArea)} sq ft ${c(rollSrc)}. Planning approved ${int(projArea)} sq ft ${c(projSrc)}${projDone ? '' : ', for work that is not signed off'}. Ask for a measured floor plan.` };
     } else if (rollArea && near(rollArea, claims.sqft)) {
       row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: int(rollArea), label: 'matches', why: `The assessor records ${int(rollArea)} sq ft ${c(rollSrc)}.` };
@@ -329,6 +331,7 @@ export function buildReport(input: RuleInput): Report {
   }
   // Sort ledger by severity so problems come first.
   const sev: Record<FindingLabel, number> = { open_case: 0, no_permit_found: 1, records_differ: 2, permitted_not_finaled: 3, records_disagree: 4, likely_stale: 5, not_settled: 6, permitted_not_updated: 7, resolved: 8, matches_planning: 9, matches: 10 };
+  for (const r of ledger) { if (r.records) r.records = fit14(r.records); if (r.listing) r.listing = fit14(r.listing); }
   if (ledger.some((r) => sev[r.label] <= 3)) ledger.sort((a, b) => sev[a.label] - sev[b.label]);
 
   /* ----- systems ----- */
@@ -755,6 +758,14 @@ export function buildReport(input: RuleInput): Report {
   };
 }
 
+/** "baths, sq ft and the renovation [1][4]": each claim's name, with the citations its row already carries. */
+function claimList(rows: ClaimRow[]): string {
+  const names = rows.map((r) => (r.key === 'renovation' ? 'the renovation' : r.key === 'adu' ? 'the in-law' : r.title.toLowerCase()));
+  const refs = [...new Set(rows.map((r) => r.why.match(/\[\d+\]/)?.[0]).filter(Boolean))].slice(0, 3).join('');
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+  return `${list}${refs ? ' ' + refs : ''}`;
+}
+
 function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: number; unitLegalized: boolean; lastUnitPermit: Row | null; unitCfc: Row | null; rollSrc: ReturnType<typeof S.roll> | null; ledger: ClaimRow[]; cases: CaseRow[]; c: (...s: any[]) => string; tone: string; active: Row[]; aduRow?: ClaimRow }): string {
   const unitsWord = x.unitsNow === 1 ? 'one-unit' : `${word(x.unitsNow)}-unit`;
   // "A two-unit home", "An 83-unit building", "A property with no housing units on record".
@@ -763,7 +774,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (x.multiParcel) {
     const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
     if (x.active.length) return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building` : 'A condo unit'} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} at the address ${x.c(...x.active.slice(0, 2).map(S.complaint))}. Ask whether ${x.active.length > 1 ? 'they involve' : 'it involves'} this unit.`;
-    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${differ.map((p) => p.title.toLowerCase()).join(', ')}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
+    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
   }
   if (x.unitLegalized && x.lastUnitPermit) {
     const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
@@ -774,7 +785,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
     return `${A} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}.${x.ledger.some((r) => r.key === 'renovation') ? ' Work is permitted but not signed off.' : ` Ask how ${x.active.length > 1 ? 'they' : 'it'} will be closed before you offer.`}`;
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
-  if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${problems.map((p) => p.title.toLowerCase()).join(', ')}.`;
+  if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${claimList(problems)}.`;
   return `${A} whose records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`;
 }
 
