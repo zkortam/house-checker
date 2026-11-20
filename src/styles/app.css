@@ -211,13 +211,13 @@ textarea.input:focus { box-shadow: none; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(12px); } }
 
-@media (prefers-reduced-motion: reduce) {
-  .cascade > *, .toast, .toast.out { animation-duration: var(--duration-reduce-motion) !important; animation-delay: 0s !important; }
-  dialog.ovl, dialog.ovl::backdrop { transform: none !important; transition-duration: var(--dur-fast) !important; }
-  .collapse, .caret { transition-duration: var(--duration-reduce-motion) !important; }
-  .spin { animation-duration: 1s !important; }
-  .btn:active, .icon-btn:active, .chip-btn:active, .slot:active { transform: none; opacity: var(--press-opacity); }
-}
+/* Reduced motion: one switch, html.reduce-motion, set by the boot script from the setting or the OS [motion §47-53].
+   Functional motion shortens, presence stays, status loops keep running. */
+html.reduce-motion .cascade > *, html.reduce-motion .toast, html.reduce-motion .toast.out { animation-duration: var(--duration-reduce-motion) !important; animation-delay: 0s !important; }
+html.reduce-motion dialog.ovl, html.reduce-motion dialog.ovl::backdrop { transform: none !important; transition-duration: var(--dur-fast) !important; }
+html.reduce-motion .collapse, html.reduce-motion .caret, html.reduce-motion .seg-thumb, html.reduce-motion .switch-knob { transition-duration: var(--duration-reduce-motion) !important; }
+html.reduce-motion .spin { animation-duration: 1s !important; }
+html.reduce-motion .btn:active, html.reduce-motion .icon-btn:active, html.reduce-motion .chip-btn:active, html.reduce-motion .slot:active, html.reduce-motion button.tile:active { transform: none; opacity: var(--press-opacity); }
 /* ---- Visual report: summary first, detail on request ---- */
 .group { scroll-margin-top: calc(var(--header-row) + 16px); }
 .tone-success { --tone: var(--success); --tone-ink: var(--success-ink); }
@@ -423,3 +423,21 @@ dialog.ovl.sm { }
 @media (min-width: 520px) { .mini-grid:has(> :nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* Labels on an overlay cell inside a card use the secondary tier: muted drops under 4.5:1 there in dark */
 .verdict-foot .row-title, .cmp-k, .mini .k, .mini .s { color: var(--text-secondary); }
+
+/* ---- Display settings ---- */
+.settings { display: flex; flex-direction: column; gap: var(--sp-5); }
+.set-row { display: flex; flex-direction: column; gap: var(--sp-2); }
+.set-label { font-weight: var(--w-medium); color: var(--text-primary); }
+.set-preview { color: var(--text-secondary); padding: var(--sp-3); border-radius: var(--radius-md); background: var(--bg-overlay); }
+.set-switch { flex-direction: row; align-items: center; gap: var(--sp-3); }
+.set-reset { align-self: flex-start; margin-inline-start: calc(var(--sp-3) * -1); }
+.seg { position: relative; display: grid; grid-template-columns: repeat(var(--seg-n), minmax(0, 1fr)); padding: 4px; border-radius: var(--radius-full); background: var(--bg-overlay); }
+.seg-thumb { position: absolute; top: 4px; bottom: 4px; inset-inline-start: 4px; width: calc((100% - 8px) / var(--seg-n)); border-radius: var(--radius-full); background: var(--seg-thumb); box-shadow: var(--shadow-sm); transform: translateX(calc(100% * var(--seg-i))); transition: transform var(--dur-normal) var(--ease-smooth); }
+.seg-opt { position: relative; appearance: none; border: 0; background: transparent; font: inherit; font-weight: var(--w-medium); color: var(--text-secondary); height: 40px; border-radius: var(--radius-full); transition: color var(--dur-fast) var(--ease-smooth); }
+.seg-opt[aria-checked="true"] { color: var(--text-primary); }
+.switch { appearance: none; border: 0; flex: none; position: relative; width: 52px; height: 32px; border-radius: var(--radius-full); background: var(--border-default); transition: background-color var(--dur-fast) var(--ease-smooth); }
+.switch[aria-checked="true"] { background: var(--cta); }
+.switch-knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 26px; height: 26px; border-radius: var(--radius-full); background: var(--thumb); box-shadow: var(--thumb-shadow); transition: transform var(--dur-instant) var(--ease-smooth); }
+.switch[aria-checked="true"] .switch-knob { transform: translateX(20px); }
+.switch[aria-checked="true"] .switch-knob { background: var(--on-cta); }
+@media (max-width: 639px) { dialog.ovl .ovl-inner { padding-bottom: calc(var(--spacing-overlay) + var(--sp-2)); } }

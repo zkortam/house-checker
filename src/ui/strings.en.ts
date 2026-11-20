@@ -22,6 +22,25 @@ export const S = {
   linkCopied: 'Link copied',
   linkNotCopied: "Couldn't copy the link",
 
+  // Display settings
+  settingsOpen: 'Display settings',
+  settingsTitle: 'Display',
+  themeLabel: 'Theme',
+  themeLight: 'Light',
+  themeDark: 'Dark',
+  themeSystem: 'Device',
+  textSizeLabel: 'Text size',
+  textSmall: 'Small',
+  textDefault: 'Default',
+  textLarge: 'Large',
+  reduceMotionLabel: 'Reduce motion',
+  reduceMotionDevice: 'Matches your device',
+  reduceMotionOn: 'Sections appear without sliding',
+  reduceMotionOff: 'Sections slide in as they load',
+  matchDevice: 'Match device',
+  previewLabel: 'Preview',
+  previewText: 'Approved, tax roll behind. Property tax $1,630 a month.',
+
   // Start
   startTitle: 'Check a home',
   startLead: "Paste a San Francisco listing. You get what the city's records say about it, in plain words.",

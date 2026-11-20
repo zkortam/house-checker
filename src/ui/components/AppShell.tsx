@@ -1,28 +1,26 @@
 'use client';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { setTheme, useSettings } from '../lib/settings';
+import { SettingsDialog } from './SettingsDialog';
 import Link from 'next/link';
 import { S } from '../strings.en';
 import { U } from '../icons';
 import { IconButton, ToastDock, useToast } from './ui';
 
-function scheme(): 'light' | 'dark' {
-  const t = document.documentElement.getAttribute('data-theme');
-  return t === 'light' ? 'light' : 'dark';
+function ThemeButton() {
+  const s = useSettings();
+  const light = s?.scheme === 'light';
+  return <IconButton label={light ? S.themeToDark : S.themeToLight} icon={light ? 'moon' : 'sun'} onClick={() => setTheme(light ? 'dark' : 'light')} />;
 }
 
-function ThemeButton() {
-  const [s, setS] = useState<'light' | 'dark' | null>(null);
-  useEffect(() => { setS(scheme()); }, []);
-  const toggle = () => {
-    const next = scheme() === 'dark' ? 'light' : 'dark';
-    const d = document.documentElement;
-    d.setAttribute('data-theme', next);
-    d.setAttribute('data-theme-scheme', next);
-    d.style.colorScheme = next;
-    try { localStorage.setItem('hc-theme', next); } catch { /* the choice lasts for this visit only */ }
-    setS(next);
-  };
-  return <IconButton label={s === 'light' ? S.themeToDark : S.themeToLight} icon={s === 'light' ? 'moon' : 'sun'} onClick={toggle} />;
+function SettingsButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <IconButton label={S.settingsOpen} icon="settings" onClick={() => setOpen(true)} />
+      <SettingsDialog open={open} onClose={() => setOpen(false)} />
+    </>
+  );
 }
 
 function ShareButton() {
@@ -51,6 +49,7 @@ export function AppShell({ children, back, title, share }: { children: ReactNode
           <div className="header-title">{back ? title : null}</div>
           {share ? <ShareButton /> : null}
           <ThemeButton />
+          <SettingsButton />
         </div>
       </header>
       <main id="content" tabIndex={-1}>{children}</main>

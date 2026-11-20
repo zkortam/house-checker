@@ -155,6 +155,39 @@ export function SlotOption({ checked, onSelect, children }: { checked: boolean; 
   return <button type="button" role="radio" aria-checked={checked} className="slot" onClick={onSelect}>{children}</button>;
 }
 
+/* ---------- Segmented control (one choice of a few) and Switch (on or off) ---------- */
+
+export function Segmented<T extends string>({ label, value, options, onChange }: {
+  label: string; value: T; options: Array<{ value: T; label: string }>; onChange: (v: T) => void;
+}) {
+  const i = Math.max(0, options.findIndex((o) => o.value === value));
+  const move = (d: number) => onChange(options[(i + d + options.length) % options.length].value);
+  return (
+    <div className="seg" role="radiogroup" aria-label={label} style={{ ['--seg-n' as string]: options.length, ['--seg-i' as string]: i }}>
+      <span className="seg-thumb" aria-hidden="true" />
+      {options.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={o.value === value} tabIndex={o.value === value ? 0 : -1}
+          className="seg-opt" onClick={() => onChange(o.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+          }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Switch({ checked, onChange, labelledBy, describedBy }: { checked: boolean; onChange: (v: boolean) => void; labelledBy: string; describedBy?: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-labelledby={labelledBy} aria-describedby={describedBy}
+      className="switch" onClick={() => onChange(!checked)}>
+      <span className="switch-knob" aria-hidden="true" />
+    </button>
+  );
+}
+
 /* ---------- Collapse: grid rows, the one height animation allowed ---------- */
 
 export function Collapse({ open, id, children }: { open: boolean; id?: string; children: ReactNode }) {

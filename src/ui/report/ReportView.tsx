@@ -13,7 +13,7 @@ import { track } from '../analytics';
 export function scrollToId(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('reduce-motion');
+  const reduce = document.documentElement.classList.contains('reduce-motion');
   el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
 }
 
