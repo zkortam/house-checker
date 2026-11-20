@@ -27,6 +27,8 @@ export interface Raw {
   nearbyPermits: Row[];  // i98e-djp9 within 150 m
   streetPermits: Row[];  // fxfq-npa9 street-space permits on this frontage (no agent names read)
   hazards: Hazards;
+  lineage?: Row[];        // nqyt-nfmd: { blklot, oldblklot, recordeddate } for the listed parcel's parents
+  parentPermits?: Row[];  // i98e-djp9 permits filed under a parent parcel before the split
   permitFacts?: Map<string, import('./permit-reader').PermitFacts>;
 }
 
@@ -89,6 +91,25 @@ export const fetchers = {
       ? await soql('j67f-aayr', { where: `building_permit_application in ${inList(nums.slice(0, 300))}`, limit: 1000 }, { label: 'permits' }).catch(() => [] as Row[])
       : [];
     return { permits, permitsf: permitsf as Row[], cfc: cfc as Row[], housing: housing as Row[] };
+  },
+
+  /** Lot lineage: parents (two levels) of the listed parcel, and permits filed under them. Never split by position. */
+  async lineage(a: ResolvedAddress): Promise<Pick<Raw, 'lineage' | 'parentPermits'>> {
+    const start = a.parcels.length > 1 ? [a.parcels[0].parcel] : a.parcels.map((p) => p.parcel);
+    const lineage: Row[] = [];
+    let frontier = start;
+    for (let depth = 0; depth < 2 && frontier.length; depth++) {
+      const rows = await soql('nqyt-nfmd', { where: `blklot in ${inList(frontier)}`, select: 'blklot,oldblklot,recordeddate,recordedid', limit: 50 }, { label: 'permits' });
+      const fresh = (rows as Row[]).filter((r) => r.oldblklot && r.oldblklot !== r.blklot && !lineage.some((l) => l.oldblklot === r.oldblklot));
+      lineage.push(...fresh);
+      frontier = [...new Set(fresh.map((r) => r.oldblklot!))].slice(0, 10);
+    }
+    const olds = [...new Set(lineage.map((l) => l.oldblklot!))].slice(0, 20);
+    const parentPermits = olds.length
+      ? dedupe(await soql('i98e-djp9', { where: `block || lot in ${inList(olds)}`, order: 'filed_date DESC', limit: 500,
+          select: 'permit_number,block,lot,filed_date,issued_date,completed_date,status,description,existing_units,proposed_units,estimated_cost' }, { label: 'permits' }) as Row[], 'permit_number')
+      : [];
+    return { lineage, parentPermits };
   },
 
   async trade(a: ResolvedAddress): Promise<Pick<Raw, 'plumbing' | 'electrical' | 'plumbingInspections'>> {

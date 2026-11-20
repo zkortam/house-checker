@@ -321,7 +321,9 @@ export function buildReport(input: RuleInput): Report {
   const tag = (p: Row, k: 'rewire' | 'sewerLateral' | 'foundation' | 'reroof') => !!raw.permitFacts?.get(p.permit_number ?? '')?.[k];
   const systems: SystemRow[] = [];
   const builtText = yearBuilt ? `Built ${yearBuilt}, so ask the inspector to look at it.` : 'Ask the inspector to look at it.';
-  const sysStatus = (p: Row): SystemRow['status'] => (isComplete(p) ? ((year(p.completed_date) ?? 0) < input.now.getUTCFullYear() - 30 ? 'old' : 'updated') : 'in_progress');
+  // An issued permit more than 3 years old that never got its final is not "in progress": it was never signed off.
+  const stale = (p: Row) => !isComplete(p) && (year(p.issued_date ?? p.filed_date) ?? 9999) < input.now.getUTCFullYear() - 3;
+  const sysStatus = (p: Row): SystemRow['status'] => (isComplete(p) ? ((year(p.completed_date) ?? 0) < input.now.getUTCFullYear() - 30 ? 'old' : 'updated') : stale(p) ? 'old' : 'in_progress');
   {
     const bathSrcs = finaledBaths.map((x) => x.p);
     const plumb = bathSrcs.length ? bathSrcs : plumbing.filter((p) => /^PP/i.test(p.permit_number ?? '')).sort((a, b) => (b.completed_date ?? b.issued_date ?? '').localeCompare(a.completed_date ?? a.issued_date ?? '')).slice(0, 1);
@@ -340,7 +342,7 @@ export function buildReport(input: RuleInput): Report {
     if (r) {
       const st = sysStatus(r);
       systems.push({ glyph: 'roof', title: 'Roof', year: year(r.completed_date ?? r.issued_date), status: st,
-        text: st === 'in_progress' ? `Reroof permit issued, not complete ${c(S.permit(r))}` : `Reroofed, permit complete ${fmtDate(r.completed_date)} ${c(S.permit(r))}` });
+        text: st === 'in_progress' ? `Reroof permit issued, not complete ${c(S.permit(r))}` : stale(r) ? `Reroof permit issued ${year(r.issued_date ?? r.filed_date)}, never signed off ${c(S.permit(r))}. Ask whether the work was done.` : `Reroofed, permit complete ${fmtDate(r.completed_date)} ${c(S.permit(r))}` });
     } else systems.push({ glyph: 'roof', title: 'Roof', year: null, status: 'no_record', text: `No roof permit on record. ${builtText}` });
   }
   {
@@ -608,6 +610,19 @@ export function buildReport(input: RuleInput): Report {
     if (ref) history.push({ date: day(finaledBaths.map((x) => x.p.completed_date).sort().pop()), kind: 'permit', text: `Plumbing finals for ${total ? word(total) + ' baths' : 'new baths'} ${ref}` });
   }
   if (unitCfc) { const ref = cited(`cfc:${unitCfc.building_permit_application}`); if (ref) history.push({ date: day(unitCfc.date_issued), kind: 'permit', text: `In-law legalized, certificate issued ${ref}` }); }
+  // Lot lineage: when the parcel was created, and notable permits filed under its parent before the split.
+  for (const l of (raw.lineage ?? []).slice(0, 2)) {
+    history.push({ date: day(l.recordeddate) || String(year(l.recordeddate) ?? ''), kind: 'other',
+      text: `Parcel ${l.blklot} created from parcel ${l.oldblklot} ${c(S.lineage(l.blklot!, l.oldblklot!, day(l.recordeddate) || null))}` });
+  }
+  const notable = (raw.parentPermits ?? []).filter((p) => !/cancel|withdraw/i.test(p.status ?? ''))
+    .map((p) => ({ p, score: (n(p.proposed_units) !== n(p.existing_units) ? 4 : 0) + (/new building|erect|construct|demoli|addition|legaliz|unit/.test(lower(p.description)) ? 2 : 0) + (isComplete(p) ? 1 : 0) }))
+    .sort((a, b) => b.score - a.score || (b.p.filed_date ?? '').localeCompare(a.p.filed_date ?? '')).slice(0, 3);
+  for (const { p } of notable) {
+    const d = day(p.completed_date ?? p.issued_date ?? p.filed_date);
+    if (!d) continue;
+    history.push({ date: d, kind: 'permit', text: `Before the lot split: ${shortWhat(p.description, 'building work')} permit on the parent lot ${c(S.parentPermit(p))}` });
+  }
   history.sort((a, b) => a.date.localeCompare(b.date));
 
   /* ----- sections ----- */
