@@ -462,3 +462,13 @@ dialog.ovl.sm { }
 html { scroll-padding-top: calc(var(--header-row) + 8px); scroll-padding-bottom: 8px; }
 .attach-wrap { display: inline-flex; align-items: center; min-width: 0; }
 .attach-wrap .attach span { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Narrow cards (small phones, large text): the label chip wraps under the title, and the comparison stacks
+   (packet/listing value on its own line, then icon + city value) so words never break mid-word. */
+.cmp-card { container-type: inline-size; }
+.cmp-head { flex-wrap: wrap; row-gap: var(--sp-1); }
+.cmp-head .chip { flex: none; }
+.cmp-v { overflow-wrap: break-word; }
+@container (max-width: 21rem) {
+  .cmp { grid-template-columns: 24px minmax(0, 1fr); }
+  .cmp > .cmp-cell:first-child { grid-column: 1 / -1; }
+}
