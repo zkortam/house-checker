@@ -27,6 +27,7 @@ export interface Raw {
   nearbyPermits: Row[];  // i98e-djp9 within 150 m
   streetPermits: Row[];  // fxfq-npa9 street-space permits on this frontage (no agent names read)
   hazards: Hazards;
+  permitFacts?: Map<string, import('./permit-reader').PermitFacts>;
 }
 
 export interface Hazards {

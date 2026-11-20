@@ -8,6 +8,7 @@ import { saveReport } from './store';
 import { writeProse } from './writer';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
+import { readPermits } from './permit-reader';
 import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
 
 /**
@@ -95,7 +96,13 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
     run('roll', () => fetchers.roll(a), (v) => (v[0]?.closed_roll_year ? `As of ${fmtDate(`${v[0].closed_roll_year}-01-01`)}` : 'No roll record'), (v) => { raw.roll = v; }),
     run('permits', async () => {
       const [p, z] = await Promise.all([fetchers.permits(a), fetchers.zoning(a).catch(() => { failed.add('zoning'); return { zoning: [], historic: [] }; })]);
-      return { ...p, ...z };
+      let last = -1;
+      const permitFacts = await readPermits(p.permits, (done, total) => {
+        if (done === last || done >= total) return;
+        last = done;
+        void emit(step('permits', 'running', { detail: `Read ${done} of ${total} permits` }));
+      });
+      return { ...p, ...z, permitFacts };
     }, (v) => { const open = v.permits.filter((p) => /issued|filed/i.test(p.status ?? '') && !p.completed_date).length; return open && open === v.permits.filter((p) => !/cancel|withdraw|expired/i.test(p.status ?? '')).length ? plural(open, 'open permit') : plural(v.permits.length, 'permit'); }, (v) => { Object.assign(raw, v); }),
     run('trade_permits', () => fetchers.trade(a), (v) => {
       const finals = v.plumbing.filter((p) => p.completed_date && /bath/i.test(p.description ?? '')).length;

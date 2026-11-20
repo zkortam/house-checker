@@ -316,6 +316,8 @@ export function buildReport(input: RuleInput): Report {
   if (ledger.some((r) => sev[r.label] <= 3)) ledger.sort((a, b) => sev[a.label] - sev[b.label]);
 
   /* ----- systems ----- */
+  // Permit tags from the permit reader (Claude, or the same regexes offline) widen what each system row finds.
+  const tag = (p: Row, k: 'rewire' | 'sewerLateral' | 'foundation' | 'reroof') => !!raw.permitFacts?.get(p.permit_number ?? '')?.[k];
   const systems: SystemRow[] = [];
   const builtText = yearBuilt ? `Built ${yearBuilt}, so ask the inspector to look at it.` : 'Ask the inspector to look at it.';
   const sysStatus = (p: Row): SystemRow['status'] => (isComplete(p) ? ((year(p.completed_date) ?? 0) < input.now.getUTCFullYear() - 30 ? 'old' : 'updated') : 'in_progress');
@@ -332,7 +334,7 @@ export function buildReport(input: RuleInput): Report {
     } else systems.push({ glyph: 'plumbing', title: 'Plumbing', year: null, status: 'no_record', text: `No plumbing permit on record. ${builtText}` });
   }
   {
-    const roofs = permits.filter((p) => /re-?roof|roofing/.test(lower(p.description)) && (isComplete(p) || isLive(p)));
+    const roofs = permits.filter((p) => (/re-?roof|roofing/.test(lower(p.description)) || tag(p, 'reroof')) && (isComplete(p) || isLive(p)));
     const r = roofs.filter(isComplete).sort((a, b) => (b.completed_date ?? '').localeCompare(a.completed_date ?? ''))[0] ?? roofs[0];
     if (r) {
       const st = sysStatus(r);
@@ -353,7 +355,7 @@ export function buildReport(input: RuleInput): Report {
     } else systems.push({ glyph: 'electrical', title: 'Wiring', year: null, status: 'no_record', text: `No electrical permit on record. ${builtText}` });
   }
   {
-    const f = permits.find((p) => /foundation|seismic|retrofit|grade beam|underpin/.test(lower(p.description)) && (isComplete(p) || isLive(p)));
+    const f = permits.find((p) => (/foundation|seismic|retrofit|grade beam|underpin/.test(lower(p.description)) || tag(p, 'foundation')) && (isComplete(p) || isLive(p)));
     if (f) {
       const st = sysStatus(f);
       systems.push({ glyph: 'foundation', title: 'Foundation', year: year(f.completed_date ?? f.issued_date), status: st,
@@ -361,7 +363,7 @@ export function buildReport(input: RuleInput): Report {
     } else systems.push({ glyph: 'foundation', title: 'Foundation', year: null, status: 'no_record', text: `No permit on record. ${builtText}` });
   }
   {
-    const s = [...permits, ...plumbing].find((p) => /sewer lateral|side sewer|lateral/.test(lower(p.description)) && (isComplete(p) || isLive(p)));
+    const s = [...permits, ...plumbing].find((p) => (/sewer lateral|side sewer|lateral/.test(lower(p.description)) || tag(p, 'sewerLateral')) && (isComplete(p) || isLive(p)));
     if (s) {
       const isPlumb = /^P/i.test(s.permit_number ?? '');
       systems.push({ glyph: 'plumbing', title: 'Sewer lateral', year: year(s.completed_date ?? s.issued_date), status: sysStatus(s), text: `Sewer lateral work on record ${c(isPlumb ? S.plumbing(s) : S.permit(s))}` });

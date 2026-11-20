@@ -46,6 +46,12 @@ export async function getJson<T = unknown>(url: string, opts: GetOpts = {}): Pro
     if (body === undefined) throw new FetchError(`no recording for ${url}`, 'offline', url);
     return body as T;
   }
+  // Demo mode: recorded responses first (fast, works offline), the network for anything not recorded.
+  if (process.env.HC_DEMO_RECORDINGS === '1') {
+    const dir = path.join(process.cwd(), 'tests', 'server', 'recordings');
+    const body = await readJsonFile(path.join(dir, key(url) + '.json'));
+    if (body !== undefined) return body as T;
+  }
   const ttl = opts.ttlMs ?? DAY;
   const file = path.join(cacheDir(), key(url) + '.json');
   if (existsSync(file)) {
