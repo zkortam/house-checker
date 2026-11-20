@@ -93,3 +93,11 @@ describe('living area, not the lot', () => {
     expect(readListingRegex('1 Main St, SF. 2,500 sq ft lot, 1,200 sq ft of living space.').sqft).toBe(1200);
   });
 });
+
+describe('bed and bath phrasing', () => {
+  it('reads words, half baths and studios', () => {
+    expect(readListingRegex('1 Main St, SF. 3 bedrooms, 2 full baths and 1 half bath.')).toMatchObject({ beds: 3, baths: 2.5 });
+    expect(readListingRegex('1 Main St, SF. Three bedrooms, two baths.')).toMatchObject({ beds: 3, baths: 2 });
+    expect(readListingRegex('1 Main St, SF. Studio, 1 bath.')).toMatchObject({ beds: 0, baths: 1 });
+  });
+});

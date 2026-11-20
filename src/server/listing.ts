@@ -38,8 +38,15 @@ export function readListingRegex(text: string): ListingClaims {
       if (v != null && v >= 10_000 && (price == null || v > price)) price = v;
     }
   }
-  const beds = t.match(/(\d+(?:\.\d+)?)\s*(?:bed(?:room)?s?|br|bd)\b/i);
-  const baths = t.match(/(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b/i);
+  // Counts as digits or words ("Three bedrooms, two baths"); "2 full baths and 1 half bath" is 2.5; a studio has 0 beds.
+  const N = '(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight)';
+  const WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+  const count = (v: string) => (/^\d/.test(v) ? v : String(WORDS[v.toLowerCase()]));
+  const bedM = t.match(new RegExp(`\\b${N}[- ]?(?:bed(?:room)?s?|br|bd)\\b`, 'i'));
+  const beds = bedM ? [bedM[0], count(bedM[1])] : /\bstudio\b/i.test(t) ? [ 'studio', '0'] : null;
+  const bathM = t.match(new RegExp(`\\b${N}[- ]?(?:full\\s+)?(?:bath(?:room)?s?|ba)\\b`, 'i'));
+  const halfM = t.match(new RegExp(`\\b(one|a|1|two|2)\\s+half[- ]?bath(?:room)?s?\\b`, 'i'));
+  const baths = bathM ? [bathM[0], String(Number(count(bathM[1])) + (halfM && !/\./.test(bathM[1]) && halfM.index! > bathM.index! ? (/^(two|2)$/i.test(halfM[1]) ? 1 : 0.5) : 0))] : null;
   // Living area, not the lot: skip a match with "lot" just before it or right after it.
   const sqft = [...t.matchAll(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)\.?/gi)]
     .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^\s*(?:\w+\s+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
