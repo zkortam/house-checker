@@ -66,10 +66,10 @@ export function readListingRegex(text: string): ListingClaims {
   // Living area, not the lot: skip a match with "lot" just before it or right after it.
   const sqft = [...t.matchAll(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)\.?/gi)]
     .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^[ \t]*(?:\w+[ \t]+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
-  const units = t.match(/\b(\d+|two|three|four|five|six)[- ]units?\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
+  const units = t.match(/\b(\d+|two|three|four|five|six)[- ](?:units?|flats?)\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
   let adu: ListingClaims['adu'] = null;
-  if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|junior adu|jadu)/i.test(t)) adu = 'legal';
-  else if (/\b(in-?law|adu|accessory dwelling|au pair|guest (suite|unit)|granny|second unit|junior adu|jadu)\b/i.test(t)) adu = 'claimed';
+  if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|2nd unit|junior adu|jadu)/i.test(t)) adu = 'legal';
+  else if (/\b(in-?law|adu|accessory dwelling|au pair|guest (suite|unit)|granny|second unit|2nd unit|junior adu|jadu)\b/i.test(t)) adu = 'claimed';
   const renovations: string[] = [];
   for (const [re, label] of [
     [/\b(fully |completely |newly |recently )?(remodel(?:ed)?|renovat(?:ed|ion))\b/i, 'remodeled'],

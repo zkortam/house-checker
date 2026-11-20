@@ -142,3 +142,10 @@ describe('Redfin layout', () => {
     expect(readListingRegex(page)).toMatchObject({ price: 1295000, beds: 3, baths: 2.5, sqft: 1520 });
   });
 });
+
+describe('SF unit phrasing', () => {
+  it('reads flats and a 2nd unit', () => {
+    expect(readListingRegex('Edwardian two flats, 600 Clement St SF').units).toBe(2);
+    expect(readListingRegex('Legal 2nd unit downstairs, 600 Clement St').adu).toBe('legal');
+  });
+});
