@@ -79,3 +79,10 @@ describe('streets without a type', () => {
     expect(parseAddress('3 bed 2 bath, San Francisco')).toBeNull();
   });
 });
+
+describe('price among other dollar amounts', () => {
+  it('skips HOA dues and monthly estimates', () => {
+    expect(readListingRegex('1 Main St, San Francisco. Condo, HOA $500. $899,000.').price).toBe(899000);
+    expect(readListingRegex('1 Main St, SF. Est. $8,912/mo. $1,349,000').price).toBe(1349000);
+  });
+});

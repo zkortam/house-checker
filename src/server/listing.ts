@@ -25,13 +25,18 @@ export function readListingRegex(text: string): ListingClaims {
   const t = text.replace(/ /g, ' ');
   const addr = parseAddress(t);
   let price: number | null = null;
-  const pm = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i) ?? t.match(/\$\s?([\d,.]+)\s*(m|million|k)?\b/i)
-    ?? t.match(/(?:offered at|asking|list price|priced at)\s*([\d,.]+)\s*(m|million|k)\b/i); // "asking 799k", no dollar sign
-  if (pm) {
-    const base = num(pm[1]);
-    const mult = pm[2] ? (/^m/i.test(pm[2]) ? 1_000_000 : 1_000) : 1;
-    price = base != null ? Math.round(base * mult) : null;
-    if (price != null && price < 10_000) price = null;
+  const toPrice = (n: string, unit?: string) => { const base = num(n); return base == null ? null : Math.round(base * (unit ? (/^m/i.test(unit) ? 1_000_000 : 1_000) : 1)); };
+  // A labelled price first ("Offered at $1,595,000", "asking 799k"); otherwise the largest dollar amount that isn't
+  // per month or per year (HOA dues, "Est. $8,912/mo").
+  const labelled = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i)
+    ?? t.match(/(?:offered at|asking|list price|priced at)\s*([\d,.]+)\s*(m|million|k)\b/i);
+  if (labelled) price = toPrice(labelled[1], labelled[2]);
+  if (price == null || price < 10_000) {
+    price = null;
+    for (const m of t.matchAll(/\$\s?([\d,.]+)\s*(m|million|k)?\b(?!\s*(?:\/|per|a)\s*(?:mo|month|yr|year))/gi)) {
+      const v = toPrice(m[1], m[2]);
+      if (v != null && v >= 10_000 && (price == null || v > price)) price = v;
+    }
   }
   const beds = t.match(/(\d+(?:\.\d+)?)\s*(?:bed(?:room)?s?|br|bd)\b/i);
   const baths = t.match(/(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b/i);
