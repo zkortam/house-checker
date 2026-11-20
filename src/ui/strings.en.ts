@@ -81,6 +81,7 @@ export const S = {
   interrupted: 'The check stopped when the page reloaded. Retry to run it again.',
   runFailed: "The check stopped before it finished. Retry to run it again.",
   loadingReport: 'Loading the report',
+  stillChecking: 'Still checking city records. This can take up to a minute.',
 
   // Errors by ApiError kind
   errInvalid: 'Enter a street address in San Francisco',
@@ -97,6 +98,7 @@ export const S = {
 
   // Report
   writtenByAi: 'Written by AI from city records',
+  writtenByRules: 'Written from city records by fixed rules',
   inspectionLabel: 'Inspection',
   glanceTitle: 'At a glance',
   goodNews: 'Good news',
@@ -197,7 +199,7 @@ export const S = {
   bookConfirmScope: 'Covers: {value}',
   bookConfirmPrice: 'About {value}',
   bookConfirmPriceUnknown: 'Price set by the specialist',
-  bookConfirmEmail: 'They get an email with a calendar invite, and you get a copy.',
+  bookConfirmEmail: 'They get an email with a calendar invite and reply with a time that works.',
   noPaidPlacement: 'No paid placement',
   bookSent: 'Request sent',
   bookNotSent: "Couldn't send the request",
