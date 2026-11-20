@@ -65,9 +65,14 @@ Data lives in `.data/` (reports, 24 h cache, outbox, idempotency keys). It is gi
 |---|---|---|---|
 | ![Verdict and tiles](submission/screenshots/1-verdict-and-tiles.png) | ![Listing vs City](submission/screenshots/2-listing-vs-city.png) | ![Specialist request](submission/screenshots/3-specialist-request-confirm.png) | ![Phone](submission/screenshots/4-phone-2055.png) |
 
-Demo video: [submission/demo.mp4](submission/demo.mp4) (2:18). Submission answers: [submission/SUBMISSION.md](submission/SUBMISSION.md).
+Demo video: [submission/demo.mp4](submission/demo.mp4) (2:01). Submission answers: [submission/SUBMISSION.md](submission/SUBMISSION.md).
 
 ## Live demo
+
+Hosted: https://house-checker-chi.vercel.app (Vercel). It runs on real city data, with demo addresses served from
+recordings. Sentences there are written by the rule templates (`HC_LLM=off`, since the Claude Code CLI only runs
+locally), reports live in a private Vercel Blob store, and emails go to a demo outbox. The full agent, with Claude
+writing the short answer and reading permits, runs locally:
 
 1. `npm run build && npm run start` with `.env.local` holding `NEXT_PUBLIC_MOCK=0` and `HC_DEMO_RECORDINGS=1`
    (recorded city data for the 6 demo addresses, so DataSF latency can't stall the demo).

@@ -80,6 +80,8 @@ export function buildReport(input: RuleInput): Report {
   const latestYear = rollRows.reduce((m, r) => Math.max(m, Number(r.closed_roll_year ?? 0)), 0);
   const roll = rollRows.find((r) => Number(r.closed_roll_year) === latestYear) ?? null;
   const rollSrc = roll ? S.roll(roll.parcel_number ?? pid, String(latestYear)) : null;
+  // An address-only check has no ledger to cite the roll first, so it would show up as [15] in the opening answer.
+  if (rollSrc && claims.units == null && claims.beds == null && claims.baths == null && claims.sqft == null && !claims.adu && !claims.renovations?.length) cites.n(rollSrc);
   const lien = latestYear ? `${latestYear}-01-01` : null;
   const yearBuilt = n(roll?.year_property_built) || null;
   const lotSqft = n(roll?.lot_area) || null;
@@ -131,8 +133,13 @@ export function buildReport(input: RuleInput): Report {
   const ledger: ClaimRow[] = [];
   const listingUnits = claims.units;
 
+  // "4 bed with legal ADU" and no unit count, on a lot the city counts as two legal units: the in-law is the second unit.
+  const aduIsSecondUnit = listingUnits == null && !!claims.adu && !unitLegalized && (recordUnits ?? rollUnits ?? 1) === 2;
+
   // Units
-  if (listingUnits != null || claims.adu) {
+  // A condo listing that says "1 unit" describes the unit itself, not the building: nothing to compare.
+  const condoSelf = multiParcel && !!addr.unit && listingUnits === 1 && !claims.adu;
+  if (!condoSelf && (listingUnits != null || claims.adu)) {
     const lu = listingUnits ?? 1;
     const adu = claims.adu;
     if (lastUnitPermit && recordUnits != null && lu === recordUnits) {
@@ -144,6 +151,11 @@ export function buildReport(input: RuleInput): Report {
         why: label === 'permitted_not_updated'
           ? `Permit ${lastUnitPermit.permit_number} ${unitLegalized ? 'legalized the ground-floor unit under the ADU program' : `changed the building from ${lastUnitPermit.existing_units?.replace('.0', '')} to ${recordUnits} units`} and closed with a certificate of final completion on ${fmtDate(unitCfc?.date_issued ?? lastUnitPermit.completed_date)} ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}. The assessor's roll is a snapshot from ${fmtDate(lien)}, before that work finished ${c(rollSrc)}.`
           : `Permit ${lastUnitPermit.permit_number} set the building at ${recordUnits} units ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}, and the assessor agrees ${c(rollSrc)}.`,
+      });
+    } else if (aduIsSecondUnit) {
+      ledger.push({
+        key: 'units', title: 'Units', listing: '1 plus in-law', records: '2', label: 'matches',
+        why: `City records count two legal units ${c(rollSrc)}, so the in-law can be the second one.`,
       });
     } else if (adu && !unitLegalized && (listingUnits == null || listingUnits === (recordUnits ?? rollUnits ?? 1))) {
       const base = recordUnits ?? rollUnits ?? 1;
@@ -242,6 +254,12 @@ export function buildReport(input: RuleInput): Report {
           ? `Complaints in ${yrsText} cited an illegal unit${detail} ${c(S.complaint(firstUnitComplaint!))}. The ${year(lastUnitPermit.filed_date)} permit was filed to comply with ${novCount === 2 ? 'both notices' : novCount > 2 ? 'the notices' : 'the notice'} of violation and is complete ${c(S.permit(lastUnitPermit))}.`
           : `Permit ${lastUnitPermit.permit_number} created the unit and is complete ${c(S.permit(lastUnitPermit))}.`,
       });
+    } else if (aduIsSecondUnit && !liveUnit[0]) {
+      ledger.push({
+        key: 'adu', title: 'In-law', listing: claims.adu === 'legal' ? 'Legal' : /garden/i.test(input.listingText) ? 'Garden in-law' : 'In-law',
+        records: 'Legal 2nd unit', label: 'matches',
+        why: `City records count two legal units ${c(rollSrc)}. Ask which one the listing calls the in-law.`,
+      });
     } else {
       const live = liveUnit[0];
       const closedUnitCase = planning.filter((p) => /ENF/.test(p.record_type ?? p.record_id ?? '') && /^closed/i.test(p.record_status ?? '') && /short-term|unpermitted dwell|udu|illegal unit|unauthori[sz]ed unit/i.test(p.description ?? ''))
@@ -289,7 +307,7 @@ export function buildReport(input: RuleInput): Report {
           const w = shortWhat(a.complaint_description, '');
           const about: Record<string, string> = { reroof: 'roofing work', baths: 'bathroom work', kitchen: 'kitchen work', remodel: 'a remodel', ADU: 'an ADU', 'ADU legalization': 'an ADU',
             foundation: 'foundation work', 'illegal unit': 'an illegal unit', demolition: 'demolition', 'sewer lateral': 'the sewer lateral', excavation: 'excavation', 'bedroom to office': 'a room conversion' };
-          return about[w] ? `Complaint about ${about[w]}` : 'Open complaint';
+          return about[w] ? `Complaint about ${about[w]}` : year(a.date_filed) ? `Open complaint from ${year(a.date_filed)}` : 'Open complaint';
         })();
     const flags = [nov?.unsafe_building === 'Y' ? 'as an unsafe building' : '', nov?.work_without_permit === 'Y' ? 'work without a permit' : '', nov?.additional_work_beyond_permit === 'Y' ? 'work beyond the permit' : ''].filter(Boolean);
     cases.push({
@@ -331,7 +349,7 @@ export function buildReport(input: RuleInput): Report {
   }
   // Sort ledger by severity so problems come first.
   const sev: Record<FindingLabel, number> = { open_case: 0, no_permit_found: 1, records_differ: 2, permitted_not_finaled: 3, records_disagree: 4, likely_stale: 5, not_settled: 6, permitted_not_updated: 7, resolved: 8, matches_planning: 9, matches: 10 };
-  for (const r of ledger) { if (r.records) r.records = fit14(r.records); if (r.listing) r.listing = fit14(r.listing); }
+  for (const r of ledger) { if (r.records) r.records = fit14(r.records); if (r.listing) r.listing = fit14(r.listing); r.why = r.why.replace(/ +([.,;:])/g, '$1'); }
   if (ledger.some((r) => sev[r.label] <= 3)) ledger.sort((a, b) => sev[a.label] - sev[b.label]);
 
   /* ----- systems ----- */
@@ -623,12 +641,15 @@ export function buildReport(input: RuleInput): Report {
     for (const x of cases) if (!grouped.has(x)) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${ref1(x.text)}`.trim() : `${x.title} ${ref1(x.text)}`.trim());
   }
   if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden in-law' : 'in-law unit'} ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
-  if (caseFee) watch.push(`Open complaints cost ${money(caseFee)} a month in fees ${c(S.dbiFees())}`);
+  if (caseFee) {
+    const one = active.length + activeNovs.length === 1;
+    watch.push(`${one ? 'The open complaint' : 'Open complaints'}${multiParcel ? ' at the building' : ''} ${one ? 'costs' : 'cost'} ${money(caseFee)} a month in fees ${c(S.dbiFees())}`);
+  }
   for (const r of ledger.filter((r) => r.label === 'permitted_not_finaled')) watch.push(`${r.title} permitted, not signed off ${r.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   for (const b of buyouts.slice(0, 1)) {
     const amt = n(b.buyout_amount); const t = n(b.number_of_tenants);
     const who = t ? `${t} tenant${t === 1 ? '' : 's'}` : 'tenants';
-    watch.push(`Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}${multiParcel ? ' in the building' : ''}: ${amt ? money(amt) : 'paid'} to ${who} ${c(S.buyout(b, addr.display, addrUpper))}`);
+    watch.push(`Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}${multiParcel ? ' in the building' : ''}${amt ? `: ${money(amt)} to ${who}` : t ? ` with ${who}` : ''} ${c(S.buyout(b, addr.display, addrUpper))}`);
   }
   if (hotel.length) watch.push(`Hotel-tax registration since ${year(hotelStart)}, a sign of short-term rentals ${c(hotelSrc)}`);
   for (const h of notes) watch.push(h.key === 'reservoir' ? `Inside the ${hz?.reservoirs?.length === 2 && hz.reservoirs.every((r) => /^Sunset/.test(r)) ? 'Sunset' : (hz?.reservoirs ?? []).join(' and ')} reservoirs failure zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
@@ -775,7 +796,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (x.multiParcel) {
     const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
     if (x.active.length) return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building` : 'A condo unit'} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} at the address ${x.c(...x.active.slice(0, 2).map(S.complaint))}. Ask whether ${x.active.length > 1 ? 'they involve' : 'it involves'} this unit.`;
-    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
+    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : !x.ledger.length ? `No open city complaints at the address${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.` : x.ledger.some((r) => !MATCHED.includes(r.label)) ? `City records don't settle ${claimList(x.ledger.filter((r) => !MATCHED.includes(r.label)))}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
   }
   if (x.unitLegalized && x.lastUnitPermit) {
     const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
@@ -787,8 +808,14 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
   if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${claimList(problems)}.`;
-  return `${A} whose records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`;
+  // Only say "match the listing" when the listing claimed something the records confirm.
+  const roll = x.rollSrc ? ' ' + x.c(x.rollSrc) : '';
+  if (!x.ledger.length) return `${A} on record${roll}, with no open city complaints.`;
+  const unsettled = x.ledger.filter((r) => !MATCHED.includes(r.label));
+  if (unsettled.length) return `${A}. ${unsettled.length === x.ledger.length ? 'City records' : 'Other claims match, but city records'} don't settle ${claimList(unsettled)}.`;
+  return `${A} whose records match the listing${roll}.`;
 }
+const MATCHED: FindingLabel[] = ['matches', 'resolved', 'matches_planning', 'permitted_not_updated'];
 
 function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[]; hotelStart: string | null; trade: Row[]; listingText: string }): Report['drafts'] {
   const a = x.addr.display;
@@ -828,7 +855,7 @@ function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: Case
   if (x.openPlanning[0]) qs.push(`Do you know whether Planning has closed enforcement case ${x.openPlanning[0].record_id}?`);
   const listingAgentEmail: EmailDraft | null = qs.length ? {
     to: x.agentEmail, subject: `Questions about ${a}`,
-    body: `Hi,\n\nI'm interested in ${a} and have a few questions before making an offer.\n\n${qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nThanks,\n`,
+    body: `Hi,\n\nI'm interested in ${a} and have ${qs.length === 1 ? 'a question' : 'a few questions'} before making an offer.\n\n${qs.length === 1 ? qs[0] : qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nThanks,\n`,
     unknownIds: ids,
   } : null;
   const p = x.openPlanning[0];

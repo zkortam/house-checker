@@ -11,6 +11,7 @@ import {
   ActionLog, Cases, CostsView, Hazards, History, InfoList, Packet, SectionBody, Sources, type AskAction,
 } from './sections';
 import { BookFlow, EmailDialog } from './actions';
+import { ShareButton } from '../components/AppShell';
 import { track } from '../analytics';
 import { packetOf } from './packet-types';
 
@@ -96,7 +97,8 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
 
         <footer className="rv-foot">
           <div className="pills">
-            <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
+            <ShareButton />
+            <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources expanded sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
               {fill(S.sourcesN, { n: report.sources.length })}
             </Pressable>
             {log.length ? (
@@ -123,13 +125,30 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
 export function Hero({ report, answer }: { report: Report; answer: string }) {
   const tone = DECISION_TONE[report.decision.tone];
   return (
+    <>
+    <Aerial address={report.address} />
     <header className={`hero tone-${tone}`}>
       <div className="hero-main">
         <h1 className="hero-addr" id="reportTitle">{report.address}</h1>
         <p className="hero-answer"><b className="hero-verdict">{report.decision.title}.</b> {answer.replace(/\s*\[\d+\]/g, '')}</p>
       </div>
-      <Ring rows={report.ledger} />
+      {report.ledger.length ? <Ring rows={report.ledger} /> : null}
     </header>
+    </>
+  );
+}
+
+/** A satellite picture of the lot (GET /api/aerial). Hidden if no imagery comes back. */
+function Aerial({ address }: { address: string }) {
+  const [state, setState] = useState<'loading' | 'ok' | 'none'>('loading');
+  if (state === 'none') return null;
+  return (
+    <figure className={`aerial${state === 'ok' ? ' on' : ''}`}>
+      <img src={`/api/aerial?address=${encodeURIComponent(address)}`} alt={fill(S.aerialAlt, { address })}
+        onLoad={() => setState('ok')} onError={() => setState('none')} />
+      <span className="aerial-pin" aria-hidden="true" />
+      <figcaption>{S.aerialCredit}</figcaption>
+    </figure>
   );
 }
 

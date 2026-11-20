@@ -101,3 +101,37 @@ describe('bed and bath phrasing', () => {
     expect(readListingRegex('1 Main St, SF. Studio, 1 bath.')).toMatchObject({ beds: 0, baths: 1 });
   });
 });
+
+describe('address number ranges', () => {
+  it('takes the first number and keeps the second as a fallback', () => {
+    expect(parseAddress('1214-1216 Fell St, San Francisco')).toMatchObject({ number: '1214', alts: ['1216'], display: '1214 Fell St' });
+    expect(parseAddress('1207-09 Fell St, SF')).toMatchObject({ number: '1207', alts: ['1209'] });
+    expect(parseAddress('Built 1900-1910. 57 Carmelita St, SF')?.alts).toBeUndefined();
+  });
+});
+
+describe('other cities vs SF streets that share their names', () => {
+  it('keeps SF streets and districts, rejects other cities in city position', async () => {
+    for (const t of ['2400 Sacramento St. 3 bed 2 bath $2M', 'Inner Richmond Edwardian. 600 Clement St, 2 bed 1 bath $1.2M', '2000 San Jose Ave, 2 bed 1 bath $1M', '345 Fremont St #2201, 1 bed $900k'])
+      expect((await readListing(t)).ok).toBe(true);
+    for (const t of ['123 Main St, Oakland CA 94607. 2 bed 1 bath $1M', '123 Main St, Berkeley, CA. 2 bed 1 bath $1M', '12 Elm St, South San Francisco, CA 94080. 2 bed 1 bath $1M'])
+      expect(await readListing(t)).toEqual({ ok: false, kind: 'outside_sf' });
+  });
+});
+
+describe('listing prose that looks like an address', () => {
+  it('skips "5 min walk" and "10 minute drive" for the real address', () => {
+    expect(parseAddress('Sunny home, 5 min walk to BART. 600 Clement St, SF')?.display).toBe('600 Clement St');
+    expect(parseAddress('Just a 10 minute drive to downtown! 600 Clement St')?.display).toBe('600 Clement St');
+    expect(parseAddress('Laundry in unit, 2 car parking lane. 600 Clement St')?.display).toBe('600 Clement St');
+    expect(parseAddress('12 Miles St, SF')?.display).toBe('12 Miles St');
+  });
+});
+
+describe('price in a pasted listing page', () => {
+  it('skips Zestimates and past sales', () => {
+    const page = '$1,295,000\n3 bd 2 ba 1,520 sqft\n1214 Fell St, San Francisco, CA 94117\nEst.: $8,204/mo\n$852/sqft  Zestimate®: $1,402,300\nPrice history\n3/1/2008 Sold $1,510,000';
+    expect(readListingRegex(page)).toMatchObject({ price: 1295000, beds: 3, baths: 2, sqft: 1520, address: '1214 Fell St' });
+    expect(readListingRegex('Zestimate: $1,402,300. 1214 Fell St SF. $1,295,000').price).toBe(1295000);
+  });
+});

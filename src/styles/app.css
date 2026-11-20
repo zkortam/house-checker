@@ -651,6 +651,91 @@ button.b-card:active { transform: scale(var(--press-subtle)); transition-duratio
 .start .chip-btn { background: none; color: var(--text-secondary); font-weight: var(--w-medium); }
 @media (hover: hover) and (pointer: fine) { .start .chip-btn:hover { color: var(--text-primary); background: var(--bg-overlay); } }
 .start .btn-fixed { white-space: nowrap; width: auto; min-width: 0; flex: none; padding-inline: var(--sp-5); }
+
+/* =====================================================================
+   Shell: Surf Studio style. A 72 px rail from 744 px, a tab pill below it. No top header.
+   ===================================================================== */
+:root { --rail: 72px; --tabs-h: 64px; }
+.rail { position: fixed; inset-block: 0; inset-inline-start: 0; z-index: var(--z-sticky); width: var(--rail); display: none;
+  flex-direction: column; justify-content: space-between; padding: 20px 2px; background: var(--header-glass); backdrop-filter: blur(var(--blur-header)); -webkit-backdrop-filter: blur(var(--blur-header)); }
+.rail ul, .tabs ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; }
+.rail ul { flex-direction: column; }
+.place { appearance: none; border: 0; background: none; font: inherit; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 0; border-radius: 14px; color: var(--text-secondary); text-decoration: none; font-size: calc(12px * var(--font-scale)); font-weight: var(--w-medium);
+  transition: color var(--dur-fast) var(--ease-smooth), background var(--dur-fast) var(--ease-smooth); }
+.place .g { width: 24px; height: 24px; }
+.place[aria-current="page"] { color: var(--text-primary); background: var(--bg-overlay); }
+@media (hover: hover) and (pointer: fine) { .place:hover { color: var(--text-primary); } }
+.place:active { transform: scale(var(--press)); transition-duration: 0s; }
+.tabs { position: fixed; z-index: var(--z-sticky); inset-inline: 0; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; pointer-events: none; }
+.tabs ul { pointer-events: auto; padding: 6px; border-radius: var(--radius-full); background: var(--header-glass); backdrop-filter: blur(var(--blur-header)); -webkit-backdrop-filter: blur(var(--blur-header));
+  box-shadow: 0 0 0 1px var(--glass-border), var(--shadow-lg); }
+.tabs .place { width: 76px; border-radius: var(--radius-full); padding: 6px 0; }
+main.with-rail { padding-bottom: calc(var(--tabs-h) + 40px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 744px) {
+  .rail { display: flex; }
+  .tabs { display: none; }
+  main.with-rail { padding-inline-start: calc(var(--rail) + max(16px, env(safe-area-inset-left, 0px))); padding-bottom: var(--sp-16); }
+}
+.header { display: none; }
+.toasts { bottom: calc(var(--tabs-h) + 28px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 744px) { .toasts { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); } }
+html { scroll-padding-top: 16px; }
+
+/* Pages: large left title, one measure */
+.page { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-8); padding-top: clamp(24px, 8vh, 96px); }
+.page-title { margin: 0; font-size: clamp(calc(30px * var(--font-scale)), calc(3.4vw * var(--font-scale)), calc(40px * var(--font-scale))); line-height: 1.1; letter-spacing: -0.035em; font-weight: 700; }
+.page-empty { margin: 0; color: var(--text-secondary); }
+.section-head { margin: 0 0 var(--sp-3); font-size: var(--text-lg); font-weight: var(--w-semibold); letter-spacing: -0.01em; }
+
+/* Prompt box (Studio PromptBox) */
+.prompt-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.prompt { background: var(--surface-card); border-radius: 24px; box-shadow: inset 0 0 0 1px var(--border-default); display: flex; flex-direction: column;
+  transition: box-shadow var(--dur-normal) var(--ease-smooth); }
+.prompt:focus-within { box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / 0.32); }
+.prompt.invalid { box-shadow: inset 0 0 0 2px var(--error); }
+.prompt textarea.field { background: transparent; min-height: 84px; padding: 22px 24px 8px; font-size: var(--text-lg); line-height: 1.55; resize: none; border: 0; outline: none; width: 100%; color: var(--text-primary); }
+.prompt-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: 12px 14px 14px; }
+.prompt-foot .attach { height: 40px; border-radius: var(--radius-full); }
+.prompt-foot .btn-fixed { white-space: nowrap; min-width: 0; padding-inline: var(--sp-5); }
+.prompt-under { min-height: 24px; padding-inline: 4px; }
+.prompt-under .field-error { padding: 0; }
+.examples { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.text-action { appearance: none; border: 0; background: none; padding: 4px 0; font: inherit; font-size: var(--text-sm); font-weight: var(--w-medium); color: var(--text-secondary); }
+@media (hover: hover) and (pointer: fine) { .text-action:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; } }
+
+/* Recent cards */
+.start-recent { margin-top: var(--sp-4); }
+.recent-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.recent-card { display: flex; flex-direction: column; gap: 4px; min-height: 112px; padding: 18px; border-radius: 20px; background: var(--surface-card); color: var(--text-primary); text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-smooth), transform var(--dur-fast) var(--ease-smooth); }
+@media (hover: hover) and (pointer: fine) { .recent-card:hover { background: var(--tile-hover); } }
+.recent-card:active { transform: scale(var(--press-subtle)); transition-duration: 0s; }
+.rc-addr { font-weight: var(--w-semibold); letter-spacing: -0.01em; }
+.rc-title { font-size: var(--text-sm); color: var(--text-secondary); }
+.recent-card.flag .rc-title { color: var(--error-ink); }
+.rc-date { margin-top: auto; font-size: calc(12px * var(--font-scale)); color: var(--text-muted); }
+.prompt textarea.field { field-sizing: content; height: auto; min-height: 84px; max-height: 260px; overflow-y: auto; }
+
+/* Studio canvas: the theme gradient with one soft light at the top */
+:root { --glow-rgb: 37 99 235; --canvas-gradient: linear-gradient(135deg, #050508 0%, #0b0916 100%); --glow: rgb(var(--glow-rgb) / 0.16); }
+:root[data-theme="light"] { --canvas-gradient: linear-gradient(135deg, #ffffff 0%, #eef0f7 100%); --glow: rgb(99 102 241 / 0.10); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --canvas-gradient: linear-gradient(135deg, #ffffff 0%, #eef0f7 100%); --glow: rgb(99 102 241 / 0.10); } }
+body:has(.page) { background: radial-gradient(circle at 50% 22%, var(--glow), transparent 60%), var(--canvas-gradient); background-attachment: fixed; min-height: 100svh; }
+.page-title { font-size: calc(28px * var(--font-scale)); letter-spacing: -0.03em; font-weight: 650; }
+.page.start { gap: var(--sp-6); padding-top: clamp(32px, 16vh, 160px); }
+.prompt { background: color-mix(in srgb, var(--surface-card) 82%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* Aerial banner on the report */
+.aerial { position: relative; margin: 0 0 var(--sp-6); height: clamp(180px, 26vw, 300px); border-radius: 28px; overflow: hidden; background: var(--surface-card); }
+.aerial img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity var(--dur-slow) var(--ease-gentle); }
+.aerial.on img { opacity: 1; }
+.aerial-pin { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 0.35), 0 2px 10px rgb(0 0 0 / 0.5); opacity: 0; transition: opacity var(--dur-slow); }
+.aerial.on .aerial-pin { opacity: 1; }
+.aerial figcaption { position: absolute; inset-inline-end: 12px; bottom: 10px; font-size: calc(11px * var(--font-scale)); color: rgb(255 255 255 / 0.85); text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); }
+@media (max-width: 743px) { .aerial { border-radius: 20px; margin-bottom: var(--sp-4); } }
+.page.start .page-title, .page .page-title { font-size: calc(28px * var(--font-scale)); line-height: 1.15; letter-spacing: -0.025em; font-weight: 650; text-align: start; }
 /* Raised surfaces (sheets, dialogs) sit lighter than the canvas; muted text there needs the secondary ink for 4.5:1. */
 dialog { --text-muted: var(--text-secondary); }
 html.reduce-motion button.b-card, html.reduce-motion .pill { transition-duration: var(--duration-reduce-motion) !important; }

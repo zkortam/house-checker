@@ -1,6 +1,6 @@
 import { soql, q, inList } from './http';
 
-export interface ParsedAddress { number: string; suffix: string | null; street: string; type: string | null; display: string; unit?: string | null }
+export interface ParsedAddress { number: string; suffix: string | null; street: string; type: string | null; display: string; unit?: string | null; alts?: string[] }
 
 const TYPES: Record<string, string> = {
   st: 'ST', street: 'ST', ave: 'AVE', av: 'AVE', avenue: 'AVE', blvd: 'BLVD', boulevard: 'BLVD', way: 'WAY',
@@ -28,8 +28,12 @@ function title(s: string): string {
 const TYPELESS_RE = /\b(\d{1,5})([A-Za-z])?\s+((?:[A-Za-z][A-Za-z'.]*)(?:\s+[A-Za-z][A-Za-z'.]*){0,4}?)\s*,?\s*(?:#\s*[A-Za-z0-9-]{1,6}\s*,?\s*)?(?:San Francisco|SF|S\.F\.)\b/i;
 const NOT_STREET = /^(bed|beds|bedroom|bedrooms|bath|baths|bathroom|bathrooms|br|ba|bd|unit|units|sq|sqft|ft|car|cars|story|stories|years?|homes?|condos?|flats?)\b/i;
 
+// Listing prose that looks like an address: "5 min walk", "10 minute drive", "2 car parking lane", "1 block to the Way".
+const PROSE_WORD = /\b(min|mins|minutes?|mile|blocks?|cars?|garage|parking|beds?|bedrooms?|baths?|bathrooms?|stor(?:y|ies)|units?|steps?|to|and|from|in|on|at|by|with|for|private|walking|quick|sq|ft)\b/i;
+const ADDRESS_RE_G = new RegExp(ADDRESS_RE.source, 'gi');
+
 export function parseAddress(text: string): ParsedAddress | null {
-  let m: RegExpMatchArray | null = text.match(ADDRESS_RE);
+  let m: RegExpMatchArray | null = [...text.matchAll(ADDRESS_RE_G)].find((x) => !PROSE_WORD.test(x[3])) ?? null;
   if (!m) {
     const t = text.match(TYPELESS_RE);
     if (!t || NOT_STREET.test(t[3])) return null;
@@ -37,13 +41,22 @@ export function parseAddress(text: string): ParsedAddress | null {
     // The unit (if any) sits between the name and the city; the code below reads it from the text after the street name.
     m[0] = `${t[1]}${t[2] ?? ''} ${t[3]}`;
   }
-  const [, number, suffix, streetRaw, typeRaw] = m;
+  const [, numberRaw, suffix, streetRaw, typeRaw] = m;
+  // A number range ("1214-1216 Fell St", "1207-09 Fell St"): the first number, then the second if the first isn't on file.
+  let number = numberRaw;
+  let alts: string[] | undefined;
+  const range = text.slice(Math.max(0, (m.index ?? 0) - 10), m.index ?? 0).match(/(\d{1,5})\s*[-–]\s*$/);
+  if (range && !suffix) {
+    const first = range[1];
+    const second = numberRaw.length < first.length ? first.slice(0, first.length - numberRaw.length) + numberRaw : numberRaw;
+    if (Number(second) > Number(first) && Number(second) - Number(first) <= 20) { number = first; alts = [second]; }
+  }
   const street = streetRaw.trim().replace(/['’]/g, '').replace(/\s+/g, ' ').toUpperCase(); // DataSF: OFARRELL
   const type = typeRaw ? TYPES[typeRaw.toLowerCase()] ?? null : null;
   const display = `${number}${suffix ? suffix.toUpperCase() : ''} ${title(street)}${type ? ' ' + TYPE_DISPLAY[type] : ''}`;
   const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
   const unit = after.match(/^\s*,?\s*(?:#|unit\s+|apt\.?\s+|suite\s+|no\.\s*)(\d{1,5}\s?[A-Za-z](?![A-Za-z])|[A-Za-z0-9-]{1,6})\b/i)?.[1]?.toUpperCase().replace(/\s+/g, '') ?? null;
-  return { number, suffix: suffix ? suffix.toUpperCase() : null, street, type, display, unit };
+  return { number, suffix: suffix ? suffix.toUpperCase() : null, street, type, display, unit, ...(alts ? { alts } : {}) };
 }
 
 export interface ParcelRef { parcel: string; block: string; lot: string }
@@ -71,6 +84,14 @@ interface AddrRow {
 }
 
 export async function resolveAddress(a: ParsedAddress): Promise<ResolvedAddress | null> {
+  for (const num of [a.number, ...(a.alts ?? [])]) {
+    const r = await resolveOne(num === a.number ? a : { ...a, number: num, display: a.display.replace(/^\d+/, num) });
+    if (r) return r;
+  }
+  return null;
+}
+
+async function resolveOne(a: ParsedAddress): Promise<ResolvedAddress | null> {
   // "Saint Francis" and "St Francis" are both written; try the other spelling when the first finds nothing.
   const alias = /^SAINT /.test(a.street) ? a.street.replace(/^SAINT /, 'ST ') : /^ST /.test(a.street) ? a.street.replace(/^ST /, 'SAINT ') : null;
   const names = [a.street, ...(alias ? [alias] : [])];

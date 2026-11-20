@@ -1,29 +1,47 @@
 'use client';
 import { useState, type ReactNode } from 'react';
-import { setTheme, useSettings } from '../lib/settings';
-import { SettingsDialog } from './SettingsDialog';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { SettingsDialog } from './SettingsDialog';
 import { S } from '../strings.en';
 import { U } from '../icons';
-import { IconButton, ToastDock, useToast } from './ui';
+import { ToastDock, useToast } from './ui';
 
-function ThemeButton() {
-  const s = useSettings();
-  const light = s?.scheme === 'light';
-  return <IconButton label={light ? S.themeToDark : S.themeToLight} icon={light ? 'moon' : 'sun'} onClick={() => setTheme(light ? 'dark' : 'light')} />;
-}
+/** Places: a rail from 744 px, a tab pill below it (Surf Studio shell). Settings holds theme, text size and motion. */
+const PLACES = [
+  { href: '/', label: S.navCheck, icon: 'house' as const, match: (p: string) => p === '/' || p.startsWith('/check') },
+  { href: '/recent', label: S.navRecent, icon: 'pending' as const, match: (p: string) => p.startsWith('/recent') },
+];
 
-function SettingsButton() {
+function Places({ kind }: { kind: 'rail' | 'tabs' }) {
+  const path = usePathname() ?? '/';
   const [open, setOpen] = useState(false);
   return (
-    <>
-      <IconButton label={S.settingsOpen} icon="settings" onClick={() => setOpen(true)} />
+    <nav className={kind} aria-label={S.mainNav}>
+      <ul>
+        {PLACES.map((p) => {
+          const on = p.match(path);
+          return (
+            <li key={p.href}>
+              <Link href={p.href} className="place" aria-current={on ? 'page' : undefined}>
+                <U name={p.icon} weight={on ? 'fill' : 'regular'} /><span>{p.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+        {kind === 'tabs' ? (
+          <li><button type="button" className="place" onClick={() => setOpen(true)}><U name="settings" /><span>{S.navSettings}</span></button></li>
+        ) : null}
+      </ul>
+      {kind === 'rail' ? (
+        <button type="button" className="place" onClick={() => setOpen(true)}><U name="settings" /><span>{S.navSettings}</span></button>
+      ) : null}
       <SettingsDialog open={open} onClose={() => setOpen(false)} />
-    </>
+    </nav>
   );
 }
 
-function ShareButton() {
+export function ShareButton() {
   const toast = useToast();
   const share = async () => {
     const url = location.href;
@@ -32,27 +50,17 @@ function ShareButton() {
     }
     try { await navigator.clipboard.writeText(url); toast.show(S.linkCopied); } catch { toast.show(S.linkNotCopied, { error: true }); }
   };
-  return <IconButton label={S.share} icon="share" onClick={share} />;
+  return <button type="button" className="pill" onClick={share}>{S.share}</button>;
 }
 
-export function AppShell({ children, back, title, share }: { children: ReactNode; back?: boolean; title?: string; share?: boolean }) {
+/** `back`, `title` and `share` are accepted for older callers; the rail replaces the header that used them. */
+export function AppShell({ children }: { children: ReactNode; back?: boolean; title?: string; share?: boolean }) {
   return (
     <ToastDock>
       <a className="skip" href="#content">{S.skip}</a>
-      <header className="header">
-        <div className="header-row">
-          {back ? (
-            <Link href="/" className="icon-btn" aria-label={S.back}><U name="back" /></Link>
-          ) : (
-            <Link href="/" className="wordmark"><U name="house" /><span>{S.appName}</span></Link>
-          )}
-          <div className="header-title">{back ? title : null}</div>
-          {share ? <ShareButton /> : null}
-          <ThemeButton />
-          <SettingsButton />
-        </div>
-      </header>
-      <main id="content" tabIndex={-1}>{children}</main>
+      <Places kind="rail" />
+      <main id="content" tabIndex={-1} className="with-rail">{children}</main>
+      <Places kind="tabs" />
     </ToastDock>
   );
 }
