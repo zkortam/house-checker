@@ -90,7 +90,7 @@ Demo video: [submission/demo.mp4](submission/demo.mp4) (2:18). Submission answer
   15 to 22 s. Any other SF address runs live against DataSF; very large condo buildings take longer.
 - Demo mode: without Resend keys, emails land in `.data/outbox/`. The specialist is a placeholder address.
   Senso and Amplitude are wired but off without keys.
-- Not done: Gmail sending, lot lineage for pre-split permits, rich rendering of disclosure-packet findings.
+- Not done: Gmail sending (needs OAuth consent); disclosure-packet findings render once Plan B ships it.
 
 ## Not advice
 
