@@ -457,3 +457,4 @@ dialog.ovl.sm { }
 .group > .steps-foot { padding: 0 var(--card-padding) var(--sp-1); min-height: calc(var(--text-sm) * 1.4286 * 2 + var(--sp-1)); align-items: flex-start; }
 .pk-page { font-size: var(--text-sm); color: var(--text-secondary); }
 .pk-v { font-size: var(--text-body); line-height: var(--lh-body); font-weight: var(--w-medium); }
+.cmp-row[aria-expanded="true"] .more { color: var(--text-secondary); }
