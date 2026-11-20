@@ -9,7 +9,7 @@ import { writeProse } from './writer';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
 import { readPermits } from './permit-reader';
-import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
+import { loadPacket, readPacketFacts, reconcilePacket, type PacketSummaryOut } from './packet';
 
 /**
  * The run: listing -> parcel -> parallel fetchers (each a live step) -> rules -> writer -> report.
@@ -145,9 +145,11 @@ async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extra
     } else {
       try {
         const facts = await readPacketFacts(packet.pages);
-        const { rows, sources } = reconcilePacket(report, facts, opts.packetFileId);
-        report = { ...report, ledger: [...report.ledger, ...rows], sources: [...report.sources, ...sources],
+        const { rows, sources, findings } = reconcilePacket(report, facts, opts.packetFileId, packet.pages);
+        const summary: PacketSummaryOut = { fileName: packet.filename ?? null, pages: packet.pages.length, findings };
+        const next: Report & { packet: PacketSummaryOut } = { ...report, ledger: [...report.ledger, ...rows], sources: [...report.sources, ...sources], packet: summary,
           sections: { ...report.sections, packet: rows.length ? { state: 'ok' } : { state: 'empty', text: 'The packet states no counts to compare' } } };
+        report = next;
         await emit(step('packet', 'done', { detail: `${packet.pages.length} pages, ${rows.length} claim${rows.length === 1 ? '' : 's'} compared` }));
       } catch (e) {
         report.sections.packet = { state: 'error', source: 'Disclosure packet', retryable: true };
