@@ -499,7 +499,7 @@ export function buildReport(input: RuleInput): Report {
   if (openPlan) unknowns.push({ id: 'u-planning-case', title: 'Is the Planning case closed?', why: `Case ${openPlan.record_id} still reads "${lower(openPlan.record_status)}". A clean close-out protects resale ${c(S.planning(openPlan))}.`, resolver: 'city', action: 'email_city' });
   const aduRow = ledger.find((r) => r.key === 'adu');
   if (aduRow && aduRow.label === 'no_permit_found') unknowns.push({ id: 'u-garden-unit', title: 'What is the in-law, legally?', why: aduRow.why.split('. ').slice(0, 1).join('') + '.', resolver: 'listing_agent', action: 'email_listing_agent' });
-  if (unitsNow >= 2) unknowns.push({ id: 'u-tenants', title: 'Is either unit rented?', why: 'A tenant changes when you can move in and what you can charge.', resolver: 'listing_agent', action: 'email_listing_agent' });
+  if (unitsNow >= 2) unknowns.push({ id: 'u-tenants', title: multiParcel ? 'Is the unit rented?' : unitsNow === 2 ? 'Is either unit rented?' : 'Are any units rented?', why: 'A tenant changes when you can move in and what you can charge.', resolver: 'listing_agent', action: 'email_listing_agent' });
   if (hotel.length) unknowns.push({ id: 'u-short-term', title: 'Are short-term rentals booked?', why: `A hotel-tax registration has been active since ${year(hotelStart)} ${c(hotelSrc)}. Bookings past closing become your problem.`, resolver: 'listing_agent', action: 'email_listing_agent' });
   const bedsRow = ledger.find((r) => r.key === 'beds');
   if (bedsRow?.label === 'not_settled') {
@@ -532,6 +532,7 @@ export function buildReport(input: RuleInput): Report {
     : firstNote.key === 'reservoir' ? 'Reservoir zone' : firstNote.key === 'landslide' ? (hz?.landslideClass ? `Landslide class ${hz.landslideClass}` : 'Landslide zone')
     : firstNote.key === 'flood' ? 'Flood zone' : firstNote.key === 'storm_flood' ? 'Storm flood zone' : firstNote.key === 'liquefaction' ? 'Liquefaction zone' : firstNote.key === 'tsunami' ? 'Tsunami zone' : firstNote.key === 'sea_level' ? 'Sea level rise' : 'Soil testing area';
   const glance: GlanceTile[] = [
+    multiParcel ? { section: 'ledger', glyph: 'parcel', label: 'Condo unit', value: '1', tone: unitTone, status: `In a ${unitsNow}-unit building` } :
     { section: 'ledger', glyph: 'parcel', label: 'Legal units', value: String(unitsNow), tone: unitTone,
       status: aduRow?.label === 'no_permit_found' ? 'In-law not permitted' : !unitsRow ? 'Listing is silent' : ['matches', 'permitted_not_updated', 'resolved', 'matches_planning'].includes(unitsRow.label) ? 'Matches listing' : LABELS[unitsRow.label].text },
     { section: 'cases', glyph: active.length ? 'violation' : 'planning', label: 'Open city cases', value: String(openCount),
@@ -626,7 +627,7 @@ export function buildReport(input: RuleInput): Report {
   };
 
   /* ----- answer and drafts (rule sentences; writer.ts may improve them) ----- */
-  const answer = ruleAnswer({ unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
+  const answer = ruleAnswer({ multiParcel, unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
   const drafts = ruleDrafts({ addr, unknowns, cases, openPlanning, lastUnitPermit, unitCfc, agentEmail: input.agentEmail, permits, ledger, active });
 
   return {
@@ -660,8 +661,12 @@ export function buildReport(input: RuleInput): Report {
   };
 }
 
-function ruleAnswer(x: { unitsNow: number; unitLegalized: boolean; lastUnitPermit: Row | null; unitCfc: Row | null; rollSrc: ReturnType<typeof S.roll> | null; ledger: ClaimRow[]; cases: CaseRow[]; c: (...s: any[]) => string; tone: string; active: Row[]; aduRow?: ClaimRow }): string {
+function ruleAnswer(x: { multiParcel: boolean; unitsNow: number; unitLegalized: boolean; lastUnitPermit: Row | null; unitCfc: Row | null; rollSrc: ReturnType<typeof S.roll> | null; ledger: ClaimRow[]; cases: CaseRow[]; c: (...s: any[]) => string; tone: string; active: Row[]; aduRow?: ClaimRow }): string {
   const unitsWord = x.unitsNow === 1 ? 'one-unit' : `${word(x.unitsNow)}-unit`;
+  if (x.multiParcel) {
+    const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
+    return `A condo unit in a ${x.unitsNow}-unit building. ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${differ.map((p) => p.title.toLowerCase()).join(', ')}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
+  }
   if (x.unitLegalized && x.lastUnitPermit) {
     const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
     return `A legal ${unitsWord} home. The in-law was legalized and signed off in ${year(x.lastUnitPermit.completed_date)} ${x.c(S.permit(x.lastUnitPermit), x.unitCfc ? S.cfc(x.unitCfc) : null)}${stale ? `, so the assessor still showing ${x.unitsNow - 1 === 1 ? 'one unit' : 'fewer units'} and one bath is out of date ${x.c(x.rollSrc)}` : ''}.`;
