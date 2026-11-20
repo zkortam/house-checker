@@ -7,6 +7,7 @@ import { fetchers, type Raw } from './sources';
 import { saveReport } from './store';
 import { writeProse } from './writer';
 import { FetchError } from './http';
+import { sensoAfterReport } from './sponsors/senso';
 import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
 
 /**
@@ -138,6 +139,7 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   if (opts.write !== false) report = await writeProse(report);
   for (const word of report.answer.split(/(?<= )/)) await emit({ type: 'delta', text: word });
   if (opts.save !== false) await saveReport(report);
+  if (opts.save !== false) sensoAfterReport(report);
   await emit({ type: 'report', report });
   await emit({ type: 'done' });
   return report;

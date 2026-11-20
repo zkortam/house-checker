@@ -3,6 +3,7 @@ import type { ActionLogEntry, ActionResult, ApiError, BookRequest, EmailSendRequ
 import { checkCopy } from '../contract/copy';
 import { EMAIL_RE, emailMode, sendEmail } from './email';
 import { appendAction, getReport, idempotent } from './store';
+import { sensoAfterAction } from './sponsors/senso';
 
 /** A11: email the listing agent or the city, offer specialist slots, and send a specialist request with an .ics invite. */
 
@@ -27,7 +28,7 @@ export async function emailAction(req: Partial<EmailSendRequest>): Promise<Actio
       id: entryId(), kind: r.kind, unknownIds: r.unknownIds ?? [], at: new Date().toISOString(),
       summary: sent.mode === 'outbox' ? `Saved to outbox (demo): email to ${who}` : `Emailed ${who}`, to: r.to.trim(),
     };
-    await appendAction(r.reportId, entry);
+    sensoAfterAction(await appendAction(r.reportId, entry), entry);
     return { ok: true, entry };
   }).catch((e: Error & { retryable?: boolean }) => err('unavailable', { retryable: e.retryable ?? true, reference: randomBytes(4).toString('hex').toUpperCase(), debug: e.message }));
 }
@@ -131,7 +132,7 @@ export async function bookAction(req: Partial<BookRequest>, now = new Date()): P
     if (!sent.ok) throw Object.assign(new Error(sent.reason), { retryable: sent.retryable });
     const summary = `${sent.mode === 'outbox' ? 'Saved to outbox (demo): requested' : 'Requested'} a ${offer.specialist} for ${when}`;
     const entry: ActionLogEntry = { id: entryId(), kind: 'book_specialist', unknownIds: [r.unknownId], at: new Date().toISOString(), summary: checkCopy(summary).length ? `Requested a ${offer.specialist}` : summary, to };
-    await appendAction(r.reportId, entry);
+    sensoAfterAction(await appendAction(r.reportId, entry), entry);
     return { ok: true, entry };
   }).catch((e: Error & { retryable?: boolean }) => err('unavailable', { retryable: e.retryable ?? true, reference: randomBytes(4).toString('hex').toUpperCase(), debug: e.message }));
 }

@@ -46,3 +46,16 @@ describe('actions (outbox mode)', () => {
     expect(badSlot).toMatchObject({ ok: false, error: { kind: 'invalid', field: 'slot' } });
   });
 });
+
+describe('Senso sponsor (A13)', () => {
+  it('is off without a key and builds cited context with one', async () => {
+    const { sensoEnabled, reportContext } = await import('../../src/server/sponsors/senso');
+    delete process.env.SENSO_API_KEY;
+    expect(sensoEnabled()).toBe(false);
+    const { report } = await run(DEMO_LISTINGS[0].text);
+    const ctx = reportContext(report!);
+    expect(ctx.title).toContain('2055 42nd Ave');
+    expect(ctx.text).toContain('[1] ');
+    expect(ctx.text).not.toMatch(/undefined/);
+  });
+});
