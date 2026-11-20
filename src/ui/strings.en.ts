@@ -109,7 +109,7 @@ export const S = {
   glanceTitle: 'At a glance',
   recordsSince: 'city records since {year}',
   noRecord: 'No record',
-  ringLabel: 'claims match the city',
+  ringLabel: 'match',
   ringNone: 'No listing claims to check',
   questionsOne: '1 question',
   questions: '{n} questions',

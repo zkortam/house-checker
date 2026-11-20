@@ -126,8 +126,7 @@ export function Hero({ report, answer }: { report: Report; answer: string }) {
     <header className={`hero tone-${tone}`}>
       <div className="hero-main">
         <h1 className="hero-addr" id="reportTitle">{report.address}</h1>
-        <p className="hero-verdict">{report.decision.title}</p>
-        <p className="hero-answer">{answer.replace(/\s*\[\d+\]/g, '')}</p>
+        <p className="hero-answer"><b className="hero-verdict">{report.decision.title}.</b> {answer.replace(/\s*\[\d+\]/g, '')}</p>
       </div>
       <Ring rows={report.ledger} />
     </header>
