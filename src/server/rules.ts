@@ -508,7 +508,9 @@ export function buildReport(input: RuleInput): Report {
       : (n(p.number_of_units_net) ?? 0) > 0 ? `${cap(word(n(p.number_of_units_net)!))} unit${n(p.number_of_units_net) === 1 ? '' : 's'} added` : `${cap(word(Math.abs(n(p.number_of_units_net)!)))} unit${n(p.number_of_units_net) === -1 ? '' : 's'} removed`;
     const st = lower(p.record_status);
     const status = st.startsWith('submit') ? 'submitted' : /approv/.test(st) ? 'approved, filed' : /review|open|pending|accepted/.test(st) ? 'under review, filed' : /complete|closed/.test(st) ? 'closed, filed' : 'filed';
-    nearby.push({ glyph: 'nearby', title: titleCase((p.project_address ?? 'Planning project').replace(/\s+\d{5}$/, '')), // never project_name: it can name a person
+    // The city writes "0 P UNKNOWN" when a project has no street address.
+    const where = (p.project_address ?? '').replace(/\s+\d{5}$/, '');
+    nearby.push({ glyph: 'nearby', title: !where || /unknown/i.test(where) ? 'Planning project nearby' : titleCase(where), // never project_name: it can name a person
       text: `${what}. Project ${p.record_id} was ${status} ${fmtDate(p.open_date)}, within 150 m ${c(S.planning(p))}.` });
   }
 
@@ -665,7 +667,7 @@ export function buildReport(input: RuleInput): Report {
     : `${({ flood: 'Inside a FEMA flood zone', storm_flood: 'Inside the 100-year storm flood zone', liquefaction: 'Inside a state liquefaction zone', tsunami: 'Inside the tsunami hazard area', sea_level: 'Inside the sea level rise maps', soil: 'Inside the Maher soil testing area' } as Record<string, string>)[h.key] ?? h.title} ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   if (nearby.length) {
     const first = nearby[0].text;
-    watch.push(/demolition/i.test(first) ? `A demolition and new ${first.match(/(\d+)-unit/)?.[1] ?? ''}-unit building planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.replace('new -unit', 'new') : `${nearby[0].title}: project planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+    watch.push(/demolition/i.test(first) ? `A demolition and new ${first.match(/(\d+)-unit/)?.[1] ?? ''}-unit building planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.replace('new -unit', 'new') : nearby[0].title === 'Planning project nearby' ? `A project planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `${nearby[0].title}: project planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   }
   const clip = (s: string) => (s.length <= 90 ? s : s.slice(0, 87).replace(/\s+\S*$/, '') + '...');
   if (unknowns.some((u) => u.specialist === 'structural engineer')) for (const h of hazards) h.text = h.text.replace('Worth raising with a structural engineer', 'Worth raising with the structural engineer');
@@ -693,7 +695,7 @@ export function buildReport(input: RuleInput): Report {
       if (second) history.push({ date: String(year(second.date_filed)), kind: 'complaint', text: `Second notice of violation for the same unit ${ref}` });
     }
   }
-  for (const a of active) { const ref = cited(`complaint:${a.complaint_number}`); if (ref) history.push({ date: day(a.date_filed), kind: 'complaint', text: `Complaint: ${lower(cases.find((x) => x.text.includes(a.complaint_number!))?.title ?? 'open complaint')} ${ref}` }); }
+  for (const a of active) { const ref = cited(`complaint:${a.complaint_number}`); if (ref) history.push({ date: day(a.date_filed), kind: 'complaint', text: (() => { const t = cases.find((x) => x.text.includes(a.complaint_number!))?.title ?? ''; return /^open complaint/i.test(t) || !t ? `Complaint filed ${ref}` : `Complaint: ${lower(t)} ${ref}`; })() }); }
   for (const b of buyouts) { const ref = cited(`buyout:${b.case_number}`); const bd = day(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date); if (ref && bd) history.push({ date: bd, kind: 'tenant', text: (() => { const t = n(b.number_of_tenants); return `Tenant buyout${t ? `, ${t} tenant${t === 1 ? '' : 's'}` : ''} ${ref}`; })() }); }
   if (roll?.current_sales_date && rollSrc) history.push({ date: roll.current_sales_date.slice(0, 7), kind: 'sale', text: `Current owner bought the ${multiParcel ? 'unit' : (unitsNow >= 5 ? 'building' : 'house')} ${c(rollSrc)}` });
   for (const p of openPlanning) { const ref = cited(`planning:${p.record_id}`); if (ref) history.push({ date: day(p.open_date), kind: 'planning', text: `Planning opens case ${p.record_id} ${ref}` }); }
