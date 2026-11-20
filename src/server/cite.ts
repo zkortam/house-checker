@@ -29,7 +29,8 @@ export function shortWhat(desc: string | undefined, fallback: string): string {
   if (/legaliz/.test(d) && /(dwelling|unit|adu)/.test(d)) return 'ADU legalization';
   if (/\badu\b|accessory dwelling/.test(d)) return 'ADU';
   if (/re-?roof|roofing/.test(d)) return 'reroof';
-  if (/bedroom.*office|office/.test(d)) return 'bedroom to office';
+  if (/demoli/.test(d)) return 'demolition';
+  if (/bedroom.*office|office.*bedroom/.test(d)) return 'bedroom to office';
   if (/foundation|shoring|grade beam/.test(d)) return 'foundation';
   if (/excavat/.test(d)) return 'excavation';
   if (/sewer|lateral/.test(d)) return 'sewer lateral';
@@ -66,7 +67,7 @@ export const S = {
     date: day(c.date_filed), url: `${R}gm2e-bten.json?complaint_number=${c.complaint_number}`, dataset: 'gm2e-bten',
   }),
   planning: (r: Row): Source => ({
-    id: `planning:${r.record_id}`, title: `Planning ${/ENF|PIC/.test(r.record_id ?? '') ? 'case' : 'project'} ${r.record_id}${r.project_name && !/ENF|PIC/.test(r.record_id ?? '') ? ', ' + titleCase(r.project_name) : ''}`,
+    id: `planning:${r.record_id}`, title: `Planning ${/ENF|PIC/.test(r.record_id ?? '') ? 'case' : 'project'} ${r.record_id}${!/ENF|PIC/.test(r.record_id ?? '') && shortWhat(`${r.project_name ?? ''} ${r.description ?? ''}`, '') ? ', ' + shortWhat(`${r.project_name ?? ''} ${r.description ?? ''}`, '') : ''}`, // fixed words only, never a project name
     publisher: 'SF Planning', date: day(r.open_date),
     url: /ENF|PIC/.test(r.record_id ?? '') ? `https://sfplanninggis.org/pim?search=${r.record_id}` : `${R}qvu5-m3a2.json?record_id=${r.record_id}`,
     dataset: /ENF|PIC/.test(r.record_id ?? '') ? 'y673-d69b' : 'qvu5-m3a2',

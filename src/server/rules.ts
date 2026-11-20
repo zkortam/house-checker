@@ -469,7 +469,7 @@ export function buildReport(input: RuleInput): Report {
       : (n(p.number_of_units_net) ?? 0) > 0 ? `${cap(word(n(p.number_of_units_net)!))} unit${n(p.number_of_units_net) === 1 ? '' : 's'} added` : `${cap(word(Math.abs(n(p.number_of_units_net)!)))} unit${n(p.number_of_units_net) === -1 ? '' : 's'} removed`;
     const st = lower(p.record_status);
     const status = st.startsWith('submit') ? 'submitted' : /approv/.test(st) ? 'approved, filed' : /review|open|pending|accepted/.test(st) ? 'under review, filed' : /complete|closed/.test(st) ? 'closed, filed' : 'filed';
-    nearby.push({ glyph: 'nearby', title: titleCase((p.project_address ?? p.project_name ?? '').replace(/\s+\d{5}$/, '')),
+    nearby.push({ glyph: 'nearby', title: titleCase((p.project_address ?? 'Planning project').replace(/\s+\d{5}$/, '')), // never project_name: it can name a person
       text: `${what}. Project ${p.record_id} was ${status} ${fmtDate(p.open_date)}, within 150 m ${c(S.planning(p))}.` });
   }
 
@@ -613,8 +613,8 @@ export function buildReport(input: RuleInput): Report {
     }
   }
   for (const a of active) { const ref = cited(`complaint:${a.complaint_number}`); if (ref) history.push({ date: day(a.date_filed), kind: 'complaint', text: `Complaint: ${lower(cases.find((x) => x.text.includes(a.complaint_number!))?.title ?? 'open complaint')} ${ref}` }); }
-  for (const b of buyouts) { const ref = cited(`buyout:${b.case_number}`); if (ref) history.push({ date: day(b.buyout_agreement_date), kind: 'tenant', text: (() => { const t = n(b.number_of_tenants); return `Tenant buyout${t ? `, ${t} tenant${t === 1 ? '' : 's'}` : ''} ${ref}`; })() }); }
-  if (roll?.current_sales_date && rollSrc) history.push({ date: roll.current_sales_date.slice(0, 7), kind: 'sale', text: `Current owner bought the house ${c(rollSrc)}` });
+  for (const b of buyouts) { const ref = cited(`buyout:${b.case_number}`); const bd = day(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date); if (ref && bd) history.push({ date: bd, kind: 'tenant', text: (() => { const t = n(b.number_of_tenants); return `Tenant buyout${t ? `, ${t} tenant${t === 1 ? '' : 's'}` : ''} ${ref}`; })() }); }
+  if (roll?.current_sales_date && rollSrc) history.push({ date: roll.current_sales_date.slice(0, 7), kind: 'sale', text: `Current owner bought the ${multiParcel ? 'unit' : (unitsNow >= 5 ? 'building' : 'house')} ${c(rollSrc)}` });
   for (const p of openPlanning) { const ref = cited(`planning:${p.record_id}`); if (ref) history.push({ date: day(p.open_date), kind: 'planning', text: `Planning opens case ${p.record_id} ${ref}` }); }
   if (hotelSrc && hotelStart) history.push({ date: day(hotelStart), kind: 'other', text: `Hotel-tax registration starts ${c(hotelSrc)}` });
   for (const p of permits) {
@@ -622,7 +622,7 @@ export function buildReport(input: RuleInput): Report {
     if (!ref) continue;
     const d = lower(p.description);
     if (p === lastUnitPermit && unitCfc) continue;
-    const label = /re-?roof|roofing/.test(d) ? 'Reroof' : /bedroom.*office/.test(d) ? 'Upstairs bedroom converted to an office' : /remodel|slab|garage/.test(d) ? 'Remodel permit' : /foundation/.test(d) ? 'Foundation permit' : `Permit ${p.permit_number}`;
+    const label = /re-?roof|roofing/.test(d) ? 'Reroof' : /bedroom.*office/.test(d) ? 'Upstairs bedroom converted to an office' : /remodel|slab|garage/.test(d) ? 'Remodel permit' : /foundation/.test(d) ? 'Foundation permit' : (() => { const w = shortWhat(p.description, ''); return w ? `${cap(w === 'baths' ? 'bathroom' : w === 'illegal unit' ? 'unit' : w)} permit` : 'Building permit'; })();
     if (isComplete(p)) history.push({ date: day(p.completed_date), kind: 'permit', text: `${label}${label.startsWith('Upstairs') ? '' : ' complete'} ${ref}` });
     else history.push({ date: day(p.issued_date ?? p.filed_date), kind: 'permit', text: `${label} issued ${ref}` });
   }
@@ -640,9 +640,12 @@ export function buildReport(input: RuleInput): Report {
   const notable = (raw.parentPermits ?? []).filter((p) => !/cancel|withdraw/i.test(p.status ?? ''))
     .map((p) => ({ p, score: (n(p.proposed_units) !== n(p.existing_units) ? 4 : 0) + (/new building|erect|construct|demoli|addition|legaliz|unit/.test(lower(p.description)) ? 2 : 0) + (isComplete(p) ? 1 : 0) }))
     .sort((a, b) => b.score - a.score || (b.p.filed_date ?? '').localeCompare(a.p.filed_date ?? '')).slice(0, 3);
+  const seenParent = new Set<string>();
   for (const { p } of notable) {
     const d = day(p.completed_date ?? p.issued_date ?? p.filed_date);
-    if (!d) continue;
+    const what = shortWhat(p.description, 'building work');
+    if (!d || seenParent.has(what)) continue; // one row per kind of work, not three "demolition" rows
+    seenParent.add(what);
     history.push({ date: d, kind: 'permit', text: `Before the lot split: ${shortWhat(p.description, 'building work')} permit on the parent lot ${c(S.parentPermit(p))}` });
   }
   history.sort((a, b) => a.date.localeCompare(b.date));
