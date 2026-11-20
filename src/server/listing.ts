@@ -20,7 +20,7 @@ export function namesOtherCity(text: string): boolean {
     const after = text.slice(at + m[0].length, at + m[0].length + 16);
     if (/^\s+(st|street|ave|avenue|blvd|boulevard|way|ter|terrace|pl|place|dr|drive|ct|court|ln|lane|rd|road|aly|alley|cir|plz|hwy)\b/i.test(after)) continue;
     if (/(inner|outer|central)\s+$/i.test(before)) continue;
-    if (/,\s*$|\bin\s+$/i.test(before) || /^\s*,?\s*(ca|california)\b|^\s*,?\s*9[0-5]\d{3}\b/i.test(after)) return true;
+    if (/,\s*$|\bin\s+$|\b(st|ave|blvd|way|dr|rd|ln|ct|pl|ter)\.?\s+$/i.test(before) || /^\s*,?\s*(ca|california)\b|^\s*,?\s*9[0-5]\d{3}\b|^\s*$/i.test(after)) return true;
   }
   return false;
 }

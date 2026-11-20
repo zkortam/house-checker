@@ -158,3 +158,10 @@ describe('bare typed addresses', () => {
     expect((await readListing('hello world')).ok).toBe(false);
   });
 });
+
+describe('other city right after the street', () => {
+  it('catches "12 Main St Oakland" without a comma', async () => {
+    expect(await readListing('12 Main St Oakland')).toEqual({ ok: false, kind: 'outside_sf' });
+    expect((await readListing('2401 Sacramento St')).ok).toBe(true);
+  });
+});
