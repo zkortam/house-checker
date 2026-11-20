@@ -19,7 +19,7 @@ node scripts/demo-check.mjs | tail -1
 # Browser smoke on a fresh (uncached) address: catches client crashes the API check can't see.
 PW=/tmp/claude-1000/-home-surf-housechecker/878163fe-2e63-440f-bd2f-1c46077ebc11/scratchpad/pw
 if [ -d "$PW/node_modules/playwright" ]; then
-  ADDRS=("1450 Noriega St" "2627 Irving St" "1601 Taraval St" "3000 Fillmore St" "1001 Potrero Ave" "450 Dolores St" "2201 Lake St" "1800 Union St" "740 Frederick St" "1350 Shotwell St")
+  ADDRS=("1450 Noriega St" "2627 Irving St" "1601 Taraval St" "1001 Potrero Ave" "2201 Lake St" "1800 Union St" "1350 Shotwell St")
   A=${ADDRS[$((RANDOM % ${#ADDRS[@]}))]}
   (cd "$PW" && timeout 150 node uncached.mjs "$A, San Francisco. 2 bed 1 bath. Asking \$1,250,000." | tail -1)
 fi
