@@ -346,12 +346,12 @@ function TimelineCard({ rows, onOpen }: { rows: HistoryRow[]; onOpen: () => void
   const yr = (d: string) => Number(d.slice(0, 4)) + (d.length >= 7 ? (Number(d.slice(5, 7)) - 1) / 12 : 0.5);
   const now = new Date().getFullYear() + 1;
   const ys = rows.map((r) => yr(r.date));
-  const from = Math.floor(Math.min(...ys, now - 12)) - 1;
+  const from = Math.floor(Math.min(...ys, now - 12));
   return (
-    <Pressable className="b-card span-2 tline" onClick={onOpen}>
+    <Pressable className="b-card span-4 tline" onClick={onOpen}>
       <span className="b-label">{S.timelineTitle}</span>
       <span className="b-big">{rows.length}<small>{fill(S.recordsSince, { year: rows[0].date.slice(0, 4) })}</small></span>
-      <span className="tl-axis" aria-hidden="true" style={{ marginTop: 'auto' }}>
+      <span className="tl-axis" aria-hidden="true">
         {rows.map((r, i) => (
           <span key={i} className={`tl-pin tone-${HISTORY_TONE[r.kind]}`} style={{ ['--p' as string]: `${((yr(r.date) - from) / (now - from)) * 100}%` }} />
         ))}
