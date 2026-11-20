@@ -98,7 +98,7 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
         <footer className="rv-foot">
           <div className="pills">
             <ShareButton />
-            <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
+            <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources expanded sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
               {fill(S.sourcesN, { n: report.sources.length })}
             </Pressable>
             {log.length ? (

@@ -37,7 +37,7 @@ out days later, after records requests, or never. (Reproducible scripts in `rese
    electrical permits, certificates of completion, complaints and violation notices, Planning cases and
    projects, tenant buyouts, hotel-tax registrations (short-term rental signal, never names), zoning and
    historic districts, projects within 150 m, and 8 hazard maps.
-3. A visual report for non-technical buyers: a verdict ("Looks solid" / "Get it checked before you offer"),
+3. A visual report for non-technical buyers: a satellite view of the lot, a verdict with how many listing claims match the city, ("Looks solid" / "Get it checked before you offer"),
    six glance tiles, good news and worth-a-look lists, Listing vs City comparisons, open cases with their
    dollar stakes, taxes at any price (slider), building systems by year, hazards checklist, history timeline,
    and every source one tap away.
@@ -86,7 +86,7 @@ FEMA NFHL, Resend, Vitest, Playwright (demo recording), ffmpeg.
 
 ## Links
 - Repository: https://github.com/zkortam/house-checker
-- Demo video: `submission/demo.mp4` in the repo (2:18, 1440×900). Upload it somewhere shareable for the form.
+- Demo video: `submission/demo.mp4` in the repo (2:01, 1440×900, recorded from the real app with captions). Upload it somewhere shareable for the form.
 - Screenshots: `submission/screenshots/` (1 verdict and tiles, 2 listing vs city, 3 specialist request
   confirm, 4 phone view).
 - Website: https://house-checker-chi.vercel.app (real city data. On the hosted site the sentences are

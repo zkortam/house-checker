@@ -364,13 +364,13 @@ export function History({ rows }: { rows: HistoryRow[] }) {
 
 /* ---------- Sources, collapsed ---------- */
 
-export function Sources({ sources, onOpen }: { sources: Source[]; onOpen: (n: number, el: HTMLElement) => void }) {
-  const [open, setOpen] = useState(false);
+export function Sources({ sources, onOpen, expanded = false }: { sources: Source[]; onOpen: (n: number, el: HTMLElement) => void; expanded?: boolean }) {
+  const [open, setOpen] = useState(expanded);
   const id = useId();
   return (
     <div className="card">
-      <Row onClick={() => setOpen(!open)} expanded={open} controls={id} lead={<U name="external" />}
-        title={open ? S.sourcesHide : fill(S.sourcesShow, { n: sources.length })} end={<U name="caret" className="caret" />} />
+      {expanded ? null : <Row onClick={() => setOpen(!open)} expanded={open} controls={id} lead={<U name="external" />}
+        title={open ? S.sourcesHide : fill(S.sourcesShow, { n: sources.length })} end={<U name="caret" className="caret" />} />}
       <Collapse open={open} id={id}>
         <ol className="src-list">
           {sources.map((s, i) => (
