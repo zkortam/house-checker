@@ -9,6 +9,7 @@ import { runCheck } from '../api';
 
 export interface RunState {
   seq: number;
+  startedAt: number;
   listingText: string;
   packetFileId?: string;
   reportId: string | null;
@@ -42,7 +43,7 @@ export function startRun(listingText: string, opts: { packetFileId?: string; fai
   const my = ++seq;
   const signal = ctrl.signal;
   set({
-    seq: my, listingText, packetFileId: opts.packetFileId, reportId: null, address: null, steps: [], progress: null,
+    seq: my, startedAt: Date.now(), listingText, packetFileId: opts.packetFileId, reportId: null, address: null, steps: [], progress: null,
     answer: '', report: null, status: 'running', error: null,
   });
   try { sessionStorage.setItem('hc-last-listing', listingText); } catch { /* storage blocked: Retry then needs the start page */ }
