@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import type { FindingLabel, PacketDoc, PacketFinding, Report, Source } from '../contract/types';
 import { checkCopy } from '../contract/copy';
 import { llmJson } from './llm';
-import { dataDir } from './store';
+import { blobGetJson, blobPutJson, dataDir } from './store';
 
 /**
  * A12: disclosure packet. POST /api/packet stores the PDF and its text (pdftotext, one entry per page).
@@ -27,20 +27,32 @@ export async function storePacket(bytes: Uint8Array, filename = 'packet.pdf'): P
   await mkdir(packetDir(), { recursive: true });
   const pdf = path.join(packetDir(), `${id}.pdf`);
   await writeFile(pdf, bytes);
+  let pages: string[];
   try {
     const { stdout } = await run('pdftotext', ['-layout', '-enc', 'UTF-8', pdf, '-'], { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
-    const pages = stdout.split('\f').map((t) => t.trim());
+    pages = stdout.split('\f').map((t) => t.trim());
     if (pages.length > 1 && pages[pages.length - 1] === '') pages.pop(); // pdftotext ends every page with a form feed
-    await writeFile(path.join(packetDir(), `${id}.json`), JSON.stringify({ id, filename: filename.slice(0, 200), at: new Date().toISOString(), pages }));
   } catch (e) {
-    return { error: 'unavailable', debug: `pdftotext failed: ${(e as Error).message}` };
+    // No pdftotext (serverless hosts): pure-JS extraction, one string per page.
+    try {
+      const { extractText, getDocumentProxy } = await import('unpdf');
+      const doc = await getDocumentProxy(new Uint8Array(bytes));
+      const { text } = await extractText(doc, { mergePages: false });
+      pages = (Array.isArray(text) ? text : [text]).map((t) => String(t).trim());
+    } catch (e2) {
+      return { error: 'unavailable', debug: `pdf text failed: ${(e as Error).message}; ${(e2 as Error).message}` };
+    }
   }
+  const record = { id, filename: filename.slice(0, 200), at: new Date().toISOString(), pages };
+  await writeFile(path.join(packetDir(), `${id}.json`), JSON.stringify(record));
+  try { await blobPutJson(`packets/${id}.json`, record); } catch (e) { console.error('blob packet write failed', id, e); }
   return { packetFileId: id };
 }
 
 export async function loadPacket(id: string): Promise<{ pages: string[]; filename: string } | null> {
   if (!safeId(id)) return null;
-  try { return JSON.parse(await readFile(path.join(packetDir(), `${id}.json`), 'utf8')); } catch { return null; }
+  try { return JSON.parse(await readFile(path.join(packetDir(), `${id}.json`), 'utf8')); } catch { /* other instance */ }
+  return blobGetJson<{ pages: string[]; filename: string }>(`packets/${id}.json`);
 }
 
 /** Which document a page belongs to, from its own text. */
