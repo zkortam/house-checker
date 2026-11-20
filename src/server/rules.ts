@@ -706,6 +706,7 @@ export function buildReport(input: RuleInput): Report {
     meta: { zoning, neighborhood: roll?.assessor_neighborhood ?? addr.neighborhood ?? null, yearBuilt, lotSqft },
     listing: { text: input.listingText, claims },
     answer,
+    answerBy: 'rules', // the writer sets 'ai' when Claude's text passes the checks
     decision,
     glance,
     highlights,

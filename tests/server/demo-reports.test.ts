@@ -88,3 +88,10 @@ describe('email drafts', () => {
     }
   }, 60_000);
 });
+
+describe('answerBy', () => {
+  it("is 'rules' when the Claude CLI is off (tests)", async () => {
+    const { report } = await run(DEMO_LISTINGS[0].text);
+    expect(report!.answerBy).toBe('rules');
+  });
+});

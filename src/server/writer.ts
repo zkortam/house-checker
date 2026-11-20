@@ -64,14 +64,14 @@ export async function writeProse(report: Report): Promise<Report> {
     try {
       const hit = JSON.parse(await readFile(cacheFile, 'utf8')) as { answer: string; inspection: string };
       if (acceptable(hit.answer, evidence, sources, 220) && acceptable(hit.inspection, evidence, sources, 240)) {
-        return { ...report, answer: hit.answer, decision: { ...report.decision, inspection: hit.inspection } };
+        return { ...report, answer: hit.answer, decision: { ...report.decision, inspection: hit.inspection }, answerBy: 'ai' };
       }
     } catch { /* miss */ }
   }
   const { value, source } = await llmJson<{ answer: string; inspection: string }>(SCHEMA, prompt,
     () => ({ answer: report.answer, inspection: report.decision.inspection }),
     { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, first: true, maxWaitMs: 10_000, validate: (v) => acceptable(v.answer, evidence, sources, 220) && acceptable(v.inspection, evidence, sources, 240) });
-  if (source === 'fallback') return report;
+  if (source === 'fallback') return { ...report, answerBy: 'rules' };
   try { await mkdir(path.dirname(cacheFile), { recursive: true }); await writeFile(cacheFile, JSON.stringify({ answer: value.answer.trim(), inspection: value.inspection.trim() })); } catch { /* best effort */ }
-  return { ...report, answer: value.answer.trim(), decision: { ...report.decision, inspection: value.inspection.trim() } };
+  return { ...report, answer: value.answer.trim(), decision: { ...report.decision, inspection: value.inspection.trim() }, answerBy: 'ai' };
 }
