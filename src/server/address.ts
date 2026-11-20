@@ -5,12 +5,12 @@ export interface ParsedAddress { number: string; suffix: string | null; street: 
 const TYPES: Record<string, string> = {
   st: 'ST', street: 'ST', ave: 'AVE', av: 'AVE', avenue: 'AVE', blvd: 'BLVD', boulevard: 'BLVD', way: 'WAY',
   ter: 'TER', terrace: 'TER', pl: 'PL', place: 'PL', dr: 'DR', drive: 'DR', ct: 'CT', court: 'CT', ln: 'LN', lane: 'LN',
-  rd: 'RD', road: 'RD', aly: 'ALY', alley: 'ALY', cir: 'CIR', circle: 'CIR', hwy: 'HWY', plz: 'PLZ', plaza: 'PLZ',
+  rd: 'RD', road: 'RD', aly: 'ALY', alley: 'ALY', cir: 'CIR', circle: 'CIR', hwy: 'HWY', plz: 'PLZ', plaza: 'PLZ', loop: 'LOOP', row: 'ROW', walk: 'WALK',
 };
-const TYPE_DISPLAY: Record<string, string> = { ST: 'St', AVE: 'Ave', BLVD: 'Blvd', WAY: 'Way', TER: 'Ter', PL: 'Pl', DR: 'Dr', CT: 'Ct', LN: 'Ln', RD: 'Rd', ALY: 'Aly', CIR: 'Cir', HWY: 'Hwy', PLZ: 'Plz' };
+const TYPE_DISPLAY: Record<string, string> = { ST: 'St', AVE: 'Ave', BLVD: 'Blvd', WAY: 'Way', TER: 'Ter', PL: 'Pl', DR: 'Dr', CT: 'Ct', LN: 'Ln', RD: 'Rd', ALY: 'Aly', CIR: 'Cir', HWY: 'Hwy', PLZ: 'Plz', LOOP: 'Loop', ROW: 'Row', WALK: 'Walk' };
 
 const ADDRESS_RE = new RegExp(
-  String.raw`\b(\d{1,5})([A-Za-z])?\s+((?:\d{1,2}(?:st|nd|rd|th))|(?:[A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2}?))\s+(` +
+  String.raw`\b(\d{1,5})([A-Za-z])?\s+((?:\d{1,2}(?:st|nd|rd|th))|(?:[A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,3}?))\s+(` +
     Object.keys(TYPES).join('|') + String.raw`)\b\.?`,
   'i',
 );
