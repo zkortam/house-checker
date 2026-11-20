@@ -31,7 +31,7 @@ function runOnce(schema: object, prompt: string, timeoutMs: number, system?: str
     const args = ['-p', '--output-format', 'json', '--no-session-persistence', '--json-schema', JSON.stringify(schema), '--tools', ''];
     if (system) args.push('--system-prompt', system);
     args.push('--', prompt);
-    const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env } });
+    const child = spawn(/*turbopackIgnore: true*/ bin, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env } });
     let out = '';
     let err = '';
     const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`claude CLI timed out after ${timeoutMs} ms`)); }, timeoutMs);
