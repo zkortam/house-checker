@@ -116,7 +116,7 @@ export function CheckScreen({ id }: { id: string }) {
 type StepCount = { done: number; total: number };
 /** Optional real counts on a step (requested as an additive contract field); never parsed out of the detail text. */
 function countOf(s: StepEvent): StepCount | null {
-  const c = (s as StepEvent & { count?: StepCount }).count;
+  const c = s.count;
   return c && c.total > 0 ? c : null;
 }
 
