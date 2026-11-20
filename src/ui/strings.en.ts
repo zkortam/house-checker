@@ -98,6 +98,7 @@ export const S = {
 
   // Report
   writtenByAi: 'Written by AI from city records',
+  writtenByRules: 'Written from city records by fixed rules',
   inspectionLabel: 'Inspection',
   glanceTitle: 'At a glance',
   goodNews: 'Good news',
