@@ -550,18 +550,22 @@ export function buildReport(input: RuleInput): Report {
   const bad = ledger.filter((r) => ['open_case', 'no_permit_found'].includes(r.label) || (r.label === 'records_differ' && ['units', 'baths', 'adu'].includes(r.key))).length
     + cases.filter((x) => x.label === 'open_case').length;
   const unsafe = novs.some((v) => v.unsafe_building === 'Y' && /^active/i.test(v.status ?? ''));
-  const tone: Decision['tone'] = unsafe ? 'stop' : bad ? 'caution' : 'clear';
+  // A clean result is only a clean result when the core records were read: no "Looks solid" without permits or complaints.
+  const unread = (['permits', 'complaints'] as const).filter((k) => failed.has(k));
+  const tone: Decision['tone'] = unsafe ? 'stop' : bad || unread.length ? 'caution' : 'clear';
   const noFoundation = systems.find((s) => s.title === 'Foundation')?.status === 'no_record';
   const noLateral = systems.find((s) => s.title === 'Sewer lateral')?.status === 'no_record';
   const extra = noFoundation && noLateral ? ' Ask the inspector to look at the foundation and sewer lateral too.' : noFoundation ? ' Ask the inspector to look at the foundation too.' : noLateral ? ' Ask for a sewer lateral camera inspection too.' : '';
   const decision: Decision = {
     tone,
-    title: tone === 'clear' ? 'Looks solid' : tone === 'caution' ? 'Get it checked before you offer' : 'Stop and ask first',
-    inspection: structural.length
+    title: tone === 'clear' ? 'Looks solid' : tone === 'caution' ? (!bad && unread.length ? 'Check again before you offer' : 'Get it checked before you offer') : 'Stop and ask first',
+    inspection: '',
+  };
+  decision.inspection = structural.length
       ? `Have a structural engineer look at the ${structural.some((a) => /excavat|shoring/.test(lower(a.complaint_description))) ? 'excavation and foundation' : 'foundation and structure'} before you offer, then a standard inspection.`
       : tone === 'clear' ? `A standard inspection${multiParcel ? ' of the unit' : unitsNow === 2 ? ' covering both units' : unitsNow >= 3 && unitsNow <= 4 ? ` covering all ${word(unitsNow)} units` : ''} is enough.${extra}`
-      : `Get a standard inspection before you offer, and ask about the open items below.${extra}`,
-  };
+      : !bad && unread.length ? `City ${unread.map((k) => (k === 'permits' ? 'permits' : 'complaints')).join(' and ')} couldn't be read this time. Run the check again before you offer, then get a standard inspection.${extra}`
+      : `Get a standard inspection before you offer, and ask about the open items below.${extra}`;
 
   /* ----- glance ----- */
   const unitsRow = ledger.find((r) => r.key === 'units');
