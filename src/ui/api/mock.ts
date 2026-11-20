@@ -1,5 +1,5 @@
 /** Mock transport: the contract fixtures replayed through mockStream, actions answered locally. */
-import type {
+import type { PacketFinding,
   ActionLogEntry, ActionResult, BookRequest, CheckRequest, EmailSendRequest, Report, SectionKey, SlotOffer, StepEvent, StreamEvent,
 } from '@contract/types';
 import { mockStream } from '@contract/mock-stream';
@@ -130,7 +130,7 @@ function withMockPacket(r: Report, fileId: string): Report {
   const base = r.sources.length;
   const src = (page: number) => ({ id: `packet:${fileId}:p${page}`, title: `Disclosure packet, page ${page}`, publisher: 'Seller', date: null, url: null, page });
   const baths = r.ledger.find((x) => x.key === 'baths');
-  const findings = [
+  const findings: PacketFinding[] = [
     { doc: 'tds', topic: 'baths', statement: '3 bathrooms', page: 2, label: 'records_differ', records: baths?.records ?? null,
       text: `The packet states 3 bathrooms on page 2 [${base + 1}]. City records show ${baths?.records ?? 'a different count'}.` },
     { doc: 'inspection', topic: 'roof', statement: 'Roof replaced about 2025', page: 9, label: 'matches', records: '2025',
@@ -143,5 +143,5 @@ function withMockPacket(r: Report, fileId: string): Report {
     sources: [...r.sources, src(2), src(9), src(4)],
     sections: { ...r.sections, packet: { state: 'ok' } },
     packet: { fileName: 'disclosures.pdf', pages: 14, findings },
-  } as Report;
+  };
 }

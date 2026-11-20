@@ -2,7 +2,8 @@ import type { ApiError } from '@contract/types';
 import { S, fill } from '../strings.en';
 
 /** ApiError kind to Plan B's own words. Never debug text or a status code. */
-export function errorText(e: ApiError): string {
+export function errorText(e: ApiError, where: 'start' | 'report' = 'report'): string {
+  if (where === 'start' && e.kind === 'not_found') return S.errAddressNotFound;
   switch (e.kind) {
     case 'invalid': return S.errInvalid;
     case 'outside_sf': return S.errOutsideSf;

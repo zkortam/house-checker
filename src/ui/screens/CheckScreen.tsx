@@ -15,6 +15,10 @@ import { SourceSheet } from '../report/actions';
 import { AppShell } from '../components/AppShell';
 import { track } from '../analytics';
 
+function lastRunId(): string | null {
+  try { return sessionStorage.getItem('hc-last-run'); } catch { return null; }
+}
+
 export function CheckScreen({ id }: { id: string }) {
   const router = useRouter();
   const run = useRun();
@@ -22,6 +26,7 @@ export function CheckScreen({ id }: { id: string }) {
   const [fetched, setFetched] = useState<Report | null>(null);
   const [fetchError, setFetchError] = useState<ApiError | null>(null);
   const [src, setSrc] = useState<number | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // A refresh or a shared link: restore the stored report.
   useEffect(() => {
@@ -30,7 +35,7 @@ export function CheckScreen({ id }: { id: string }) {
     setFetchError(null);
     getReport(id).then((r) => { if (!on) return; if (r.ok) setFetched(r.value); else setFetchError(r.error); });
     return () => { on = false; };
-  }, [id, live]);
+  }, [id, live, reloadKey]);
 
   const report = live?.report ?? (live ? null : fetched);
   const address = report?.address ?? live?.address ?? null;
@@ -76,14 +81,19 @@ export function CheckScreen({ id }: { id: string }) {
 
           {fetchError && !live ? (
             <Card>
-              <Row tone={fetchError.kind === 'not_found' ? 'neutral' : 'error'} lead={<U name="failed" className="ink" />} title={errorText(fetchError)}
-                end={fetchError.retryable ? <Button kind="text" size="sm" onClick={() => router.refresh()}>{S.retry}</Button> : <Button kind="text" size="sm" onClick={() => router.push('/')}>{S.startAnother}</Button>} />
+              {fetchError.kind === 'not_found' && lastRunId() === id ? (
+                <Row tone="neutral" lead={<U name="failed" className="ink" />} title={S.interrupted}
+                  end={<Button kind="text" size="sm" onClick={retry}>{S.retry}</Button>} />
+              ) : (
+                <Row tone={fetchError.kind === 'not_found' ? 'neutral' : 'error'} lead={<U name="failed" className="ink" />} title={errorText(fetchError)}
+                  end={fetchError.retryable ? <Button kind="text" size="sm" onClick={() => setReloadKey((k) => k + 1)}>{S.retry}</Button> : <Button kind="text" size="sm" onClick={() => router.push('/')}>{S.startAnother}</Button>} />
+              )}
             </Card>
           ) : null}
 
           {!live && !report && !fetchError ? <div className="loading-line"><Spinner />{S.loadingReport}</div> : null}
 
-          {live ? <Steps steps={live.steps} progress={live.progress} startedAt={live.startedAt} writing={live.answer.length > 0 && !live.report} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
+          {live ? <Steps steps={live.steps} progress={live.progress} startedAt={live.startedAt} lastEventAt={live.lastEventAt} writing={live.answer.length > 0 && !live.report} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
 
           {live && (live.status === 'failed' || live.status === 'error') && !live.report ? (
             <Card>
@@ -106,7 +116,7 @@ export function CheckScreen({ id }: { id: string }) {
 type StepCount = { done: number; total: number };
 /** Optional real counts on a step (requested as an additive contract field); never parsed out of the detail text. */
 function countOf(s: StepEvent): StepCount | null {
-  const c = (s as StepEvent & { count?: StepCount }).count;
+  const c = s.count;
   return c && c.total > 0 ? c : null;
 }
 
@@ -127,9 +137,12 @@ function clock(sec: number): string {
 }
 
 const LONG_WAIT_SEC = 12;
+/** No event for this long after every step finished: offer Retry (never retried on a hidden timer). */
+const STALL_SEC = 60;
 
-function Steps({ steps, progress, startedAt, writing, done, onRetry }: { steps: StepEvent[]; progress: string | null; startedAt: number; writing: boolean; done: boolean; onRetry: () => void }) {
+function Steps({ steps, progress, startedAt, lastEventAt, writing, done, onRetry }: { steps: StepEvent[]; progress: string | null; startedAt: number; lastEventAt: number; writing: boolean; done: boolean; onRetry: () => void }) {
   const elapsed = useElapsed(startedAt, done);
+  const quiet = Math.floor((Date.now() - lastEventAt) / 1000);
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   const failed = steps.filter((s) => s.status === 'failed');
@@ -170,7 +183,8 @@ function Steps({ steps, progress, startedAt, writing, done, onRetry }: { steps: 
       ) : null}
       {!done ? (
         <p className="steps-foot" aria-live="off">
-          {!running && (progress || writing) ? <><Spinner />{writing ? S.writing : progress}</>
+          {!running && steps.length && quiet >= STALL_SEC ? <>{S.stalled}<Button kind="text" size="sm" onClick={onRetry}>{S.retry}</Button></>
+            : !running && steps.length ? <><Spinner />{writing || !progress ? S.writing : progress}</>
             : elapsed >= LONG_WAIT_SEC ? S.longWait
             : !steps.length ? S.starting
             : fill(S.stepsProgress, { done: steps.filter((x) => x.status !== 'running').length, total: steps.length })}
