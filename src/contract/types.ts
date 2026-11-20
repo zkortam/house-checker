@@ -50,6 +50,7 @@ export interface Source {
   date: string | null;      // ISO date "2025-05-16", or "2025" / "2025-05" when that is all that is known
   url: string | null;       // exact record link; null when no safe link exists (rendered as plain text)
   dataset?: string;         // DataSF id, e.g. "i98e-djp9"
+  page?: number;            // 1-based page, only for disclosure-packet sources (id "packet:<fileId>:p<n>", url null)
 }
 
 /* ---------- Report sections ---------- */
@@ -205,6 +206,28 @@ export interface Report {
   sources: Source[];
   actions: ActionLogEntry[];
   drafts: { listingAgentEmail: EmailDraft | null; cityEmail: EmailDraft | null };
+  packet?: PacketSummary | null; // present only when a disclosure packet was added
+}
+
+/* ---------- Disclosure packet (optional; A12) ---------- */
+
+export type PacketDoc = 'inspection' | 'pest' | 'tds' | 'spq' | '3r' | 'nhd' | 'title' | 'hoa' | 'other';
+
+/** One thing the disclosure packet states, compared with city records. */
+export interface PacketFinding {
+  doc: PacketDoc;           // which document in the packet
+  topic: 'units' | 'baths' | 'beds' | 'sqft' | 'roof' | 'foundation' | 'permits' | 'other';
+  statement: string;        // short plain paraphrase of what the packet says, at most 90 characters: "3 bathrooms"
+  page: number;             // 1-based page in the uploaded PDF
+  label: FindingLabel;      // vs city records: matches | records_differ | not_settled (code decides)
+  records: string | null;   // what the city says, at most 14 characters; null renders EMPTY_VALUE
+  text: CitedText;          // "The packet states 3 bathrooms on page 1 [23]. City records show 4 [3][5]."
+}
+
+export interface PacketSummary {
+  fileName: string | null;  // as uploaded
+  pages: number;
+  findings: PacketFinding[]; // may be empty; then sections.packet is { state: 'empty', text }
 }
 
 export interface ListingClaims {
@@ -243,6 +266,7 @@ export interface StepEvent {
   detail?: string;          // live and real: "Read 12 of 31 permits", then "31 permits"
   reason?: string;          // when failed: "Couldn't reach DBI permits"
   retryable?: boolean;
+  count?: { done: number; total: number }; // real progress for a running step, e.g. permits read 200 of 302
 }
 
 /** One JSON object per `data:` line. A stream that ends before `done` is a failed run, never a short one. */
