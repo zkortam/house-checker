@@ -76,3 +76,15 @@ describe('system ages', () => {
     }
   }, 60_000);
 });
+
+describe('email drafts', () => {
+  it('match the contract fixtures word for word for both fixture listings', async () => {
+    for (const key of ['2055-42nd-ave', '57-carmelita-st']) {
+      const fx = await import(`../../src/contract/fixtures/${key}`);
+      const fixture = Object.values(fx).find((v: any) => v && v.drafts) as any;
+      const { report } = await run(DEMO_LISTINGS.find((l) => l.key === key)!.text);
+      expect(report!.drafts.listingAgentEmail?.body).toBe(fixture.drafts.listingAgentEmail.body);
+      expect(report!.drafts.listingAgentEmail?.unknownIds).toEqual(fixture.drafts.listingAgentEmail.unknownIds);
+    }
+  }, 60_000);
+});

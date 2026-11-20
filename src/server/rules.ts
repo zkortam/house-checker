@@ -671,7 +671,7 @@ export function buildReport(input: RuleInput): Report {
   const answerBase = ruleAnswer({ multiParcel, unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
   const missedNote = missed.length ? ` ${missed.map((k) => ({ permits: 'Building permits', complaints: 'City complaints', planning: 'Planning records' })[k]).join(' and ')} couldn't be read this time.` : '';
   const answer = (answerBase + missedNote).length <= 220 ? answerBase + missedNote : answerBase;
-  const drafts = ruleDrafts({ addr, unknowns, cases, openPlanning, lastUnitPermit, unitCfc, agentEmail: input.agentEmail, permits, ledger, active });
+  const drafts = ruleDrafts({ addr, unknowns, cases, openPlanning, lastUnitPermit, unitCfc, agentEmail: input.agentEmail, permits, ledger, active, hotelStart, trade: multiParcel ? [] : [...plumbing, ...electrical], listingText: input.listingText });
 
   return {
     id: input.reportId,
@@ -725,22 +725,40 @@ function ruleAnswer(x: { multiParcel: boolean; unitsNow: number; unitLegalized: 
   return `${A} whose records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`;
 }
 
-function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[] }): Report['drafts'] {
+function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[]; hotelStart: string | null; trade: Row[]; listingText: string }): Report['drafts'] {
   const a = x.addr.display;
   const qs: string[] = [];
   const ids: string[] = [];
   const add = (id: string, q: string) => { if (x.unknowns.some((u) => u.id === id)) { qs.push(q); ids.push(id); } };
   const tq = x.unknowns.find((u) => u.id === 'u-tenants')?.title ?? 'Is either unit rented?';
   add('u-tenants', `${tq.replace(/ rented\?$/, ' currently rented?')} If so, what are the rents and lease terms?`);
-  add('u-short-term', 'City records show a hotel-tax registration at this address. Are any short-term rental bookings scheduled after closing?');
-  add('u-bedrooms', "Could you share the floor plan? Public records don't list bedrooms, and a recent permit converted one to an office.");
-  add('u-garden-unit', 'What is the in-law unit, legally? I could not find a permit that creates a second unit. Does anyone live there?');
-  add('u-close-cases', `Will the active complaints${x.active.length ? ` (${x.active.map((c) => c.complaint_number).join(', ')})` : ''} and open permits be closed before closing, and who pays any fees?`);
+  const hy = year(x.hotelStart);
+  add('u-short-term', `City records show a hotel-tax registration at this address${hy ? ` since ${hy}` : ''}. Are any short-term rental bookings scheduled after closing?`);
+  if (x.unknowns.some((u) => u.id === 'u-close-cases')) {
+    const nums = x.active.map((c) => c.complaint_number!).filter(Boolean).sort();
+    const list = nums.length > 1 ? `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}` : nums[0];
+    if (nums.length) add('u-close-cases', `What is the status of complaint${nums.length > 1 ? 's' : ''} ${list}? Will ${nums.length > 1 ? 'they' : 'it'} be closed, with fees paid, before closing?`);
+    else add('u-close-cases', 'Will the open permits and cases be closed, with fees paid, before closing?');
+    // The main job (largest live building permit by cost), then one plumbing and one electrical permit.
+    const issued = (p: Row) => isLive(p) && /issued/i.test(p.status ?? '');
+    const cost = (p: Row) => Number(p.revised_cost ?? p.estimated_cost ?? 0) || 0;
+    const main = x.permits.filter(issued).sort((a, b) => cost(b) - cost(a))[0];
+    const pp = x.trade.find((p) => issued(p) && /^PP/i.test(p.permit_number ?? ''));
+    const el = x.trade.find((p) => issued(p) && /^E/i.test(p.permit_number ?? ''));
+    const open = [main, pp, el].map((p) => p?.permit_number).filter(Boolean) as string[];
+    if (open.length) qs.push(`When do you expect final inspections on permit${open.length > 1 ? 's' : ''} ${open.length > 1 ? `${open.slice(0, -1).join(', ')} and ${open[open.length - 1]}` : open[0]}?`);
+  }
+  const bedPermit = x.permits.find((p) => /bedroom/.test(lower(p.description)) && isComplete(p));
+  const by = bedPermit ? year(bedPermit.completed_date) : null;
+  add('u-bedrooms', `Could you share the floor plan? Public records don't list bedrooms, and a ${by ?? 'recent'} permit converted one to an office.`);
+  add('u-garden-unit', `The listing mentions ${/garden in-?law/i.test(x.listingText) ? 'a garden in-law' : /\badu\b/i.test(x.listingText) ? 'an ADU' : 'an in-law unit'}. Is it a permitted unit, and is anyone living there?`);
   const docs = [x.lastUnitPermit?.permit_number, ...x.permits.filter((p) => /complete/.test(p.status ?? '') && /remodel|bath|stair|adu/.test(lower(p.description)) && p !== x.lastUnitPermit).map((p) => p.permit_number)].filter(Boolean).slice(0, 2);
-  const want = ['the 3R report',
+  const want = ['the 3R report', ...(x.unknowns.some((u) => u.id === 'u-excavation') ? ["the shoring plans and the engineer's letters for the excavation"] : []),
     ...(docs.length ? [`the job cards for permit${docs.length > 1 ? 's' : ''} ${docs.join(' and ')}`] : []),
-    ...(x.unitCfc ? [`the certificate of final completion for ${(x.unitCfc.building_address ?? '').replace(/\s+(Avenue|Street)$/i, '')}`] : [])];
-  qs.push(`Could you share ${want.length < 3 ? want.join(' and ') : `${want.slice(0, -1).join(', ')}, and ${want[want.length - 1]}`}?`);
+    ...(x.unitCfc ? [`the certificate of final completion for ${(x.unitCfc.building_address ?? '').match(/^\d+[A-Z]?\b/i)?.[0]?.toUpperCase() ?? 'the in-law unit'}`] : [])];
+  // "A and B"; "A, B and C" reads wrong when an item has its own "and", so those lists use commas.
+  const joined = want.length === 1 ? want[0] : want.length === 2 ? (/ and the /.test(want[1]) ? want.join(', ') : want.join(' and ')) : `${want.slice(0, -1).join(', ')}, and ${want[want.length - 1]}`;
+  qs.push(`Could you share ${joined}?`);
   if (x.openPlanning[0]) qs.push(`Do you know whether Planning has closed enforcement case ${x.openPlanning[0].record_id}?`);
   const listingAgentEmail: EmailDraft | null = qs.length ? {
     to: x.agentEmail, subject: `Questions about ${a}`,
