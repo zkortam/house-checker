@@ -66,3 +66,13 @@ describe('errors', () => {
     expect(events[0]).toMatchObject({ type: 'error', error: { kind: 'invalid' } });
   });
 });
+
+describe('system ages', () => {
+  it('never labels a system "Over 30 years" unless its permit is that old', async () => {
+    const { DEMO_LISTINGS } = await import('../../src/server/demo-listings');
+    for (const l of DEMO_LISTINGS) {
+      const { report } = await run(l.text);
+      for (const s of report!.systems) if (s.status === 'old') expect(s.year ?? 0).toBeLessThan(2026 - 30);
+    }
+  }, 60_000);
+});

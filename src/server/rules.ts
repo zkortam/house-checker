@@ -323,7 +323,7 @@ export function buildReport(input: RuleInput): Report {
   const builtText = yearBuilt ? `Built ${yearBuilt}, so ask the inspector to look at it.` : 'Ask the inspector to look at it.';
   // An issued permit more than 3 years old that never got its final is not "in progress": it was never signed off.
   const stale = (p: Row) => !isComplete(p) && (year(p.issued_date ?? p.filed_date) ?? 9999) < input.now.getUTCFullYear() - 3;
-  const sysStatus = (p: Row): SystemRow['status'] => (isComplete(p) ? ((year(p.completed_date) ?? 0) < input.now.getUTCFullYear() - 30 ? 'old' : 'updated') : stale(p) ? 'old' : 'in_progress');
+  const sysStatus = (p: Row): SystemRow['status'] => (isComplete(p) ? ((year(p.completed_date) ?? 0) < input.now.getUTCFullYear() - 30 ? 'old' : 'updated') : stale(p) && (year(p.issued_date ?? p.filed_date) ?? 9999) < input.now.getUTCFullYear() - 30 ? 'old' : 'in_progress');
   {
     const bathSrcs = finaledBaths.map((x) => x.p);
     const plumb = bathSrcs.length ? bathSrcs : plumbing.filter((p) => /^PP/i.test(p.permit_number ?? '')).sort((a, b) => (b.completed_date ?? b.issued_date ?? '').localeCompare(a.completed_date ?? a.issued_date ?? '')).slice(0, 1);
@@ -342,7 +342,7 @@ export function buildReport(input: RuleInput): Report {
     if (r) {
       const st = sysStatus(r);
       systems.push({ glyph: 'roof', title: 'Roof', year: year(r.completed_date ?? r.issued_date), status: st,
-        text: st === 'in_progress' ? `Reroof permit issued, not complete ${c(S.permit(r))}` : stale(r) ? `Reroof permit issued ${year(r.issued_date ?? r.filed_date)}, never signed off ${c(S.permit(r))}. Ask whether the work was done.` : `Reroofed, permit complete ${fmtDate(r.completed_date)} ${c(S.permit(r))}` });
+        text: stale(r) ? `Reroof permit issued ${year(r.issued_date ?? r.filed_date)}, never signed off ${c(S.permit(r))}. Ask whether the work was done.` : st === 'in_progress' ? `Reroof permit issued, not complete ${c(S.permit(r))}` : `Reroofed, permit complete ${fmtDate(r.completed_date)} ${c(S.permit(r))}` });
     } else systems.push({ glyph: 'roof', title: 'Roof', year: null, status: 'no_record', text: `No roof permit on record. ${builtText}` });
   }
   {
