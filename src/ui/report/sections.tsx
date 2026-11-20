@@ -54,7 +54,10 @@ export function Verdict({ report, answer, streaming }: { report: Report | null; 
           </div>
         </div>
       ) : null}
-      <p className="disclosure"><U name="ai" className="ai-g" />{S.writtenByAi}</p>
+      {/* answerBy is a requested additive contract field; absent means AI wrote it (today's default). */}
+      {(report as Report & { answerBy?: 'ai' | 'rules' }).answerBy === 'rules'
+        ? <p className="disclosure"><U name="info" className="ai-g" />{S.writtenByRules}</p>
+        : <p className="disclosure"><U name="ai" className="ai-g" />{S.writtenByAi}</p>}
     </div>
   );
 }

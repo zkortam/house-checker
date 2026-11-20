@@ -189,6 +189,7 @@ export interface Report {
   meta: { zoning: string | null; neighborhood: string | null; yearBuilt: number | null; lotSqft: number | null };
   listing: { text: string; claims: ListingClaims };
   answer: CitedText;        // the short answer under the verdict: 1 or 2 short sentences, at most 220 characters
+  answerBy?: 'ai' | 'rules'; // who wrote answer and decision.inspection: the Claude CLI, or the rule templates (CLI off or failed). Absent = 'ai'
   decision: Decision;
   glance: GlanceTile[];     // exactly 6, in this order: ledger, cases, costs, tenants, hazards, upside
   highlights: { good: CitedText[]; watch: CitedText[] };  // 2 to 5 each, one short line each (at most 90 characters)
