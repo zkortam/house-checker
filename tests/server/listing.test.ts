@@ -63,3 +63,10 @@ describe('agent email', () => {
     expect(r.ok && r.agentEmail).toBe('agent@example.com');
   });
 });
+
+describe('street spellings', () => {
+  it("drops apostrophes so O'Farrell matches the city's OFARRELL, and shows it with one", () => {
+    expect(parseAddress("631 O'Farrell St, San Francisco")).toMatchObject({ street: 'OFARRELL', display: "631 O'Farrell St" });
+    expect(parseAddress('213 06th Ave, San Francisco')?.display).toBe('213 6th Ave');
+  });
+});

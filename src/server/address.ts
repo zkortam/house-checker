@@ -17,7 +17,8 @@ const ADDRESS_RE = new RegExp(
 
 function title(s: string): string {
   s = s.replace(/^0+(\d)/, '$1'); // DataSF writes 06TH; people write 6th
-  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n, o) => n + o.toLowerCase());
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n, o) => n + o.toLowerCase())
+    .replace(/\bO(farrell|shaughnessy|reilly|connor|neil)\b/, (_, r: string) => `O'${r[0].toUpperCase()}${r.slice(1)}`); // DataSF drops the apostrophe
 }
 
 /** Finds the first street address in free text. Never guesses a street type that isn't written. */
@@ -25,7 +26,7 @@ export function parseAddress(text: string): ParsedAddress | null {
   const m = text.match(ADDRESS_RE);
   if (!m) return null;
   const [, number, suffix, streetRaw, typeRaw] = m;
-  const street = streetRaw.trim().replace(/\s+/g, ' ').toUpperCase();
+  const street = streetRaw.trim().replace(/['’]/g, '').replace(/\s+/g, ' ').toUpperCase(); // DataSF: OFARRELL
   const type = TYPES[typeRaw.toLowerCase()] ?? null;
   const display = `${number}${suffix ? suffix.toUpperCase() : ''} ${title(street)}${type ? ' ' + TYPE_DISPLAY[type] : ''}`;
   const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
@@ -58,15 +59,24 @@ interface AddrRow {
 }
 
 export async function resolveAddress(a: ParsedAddress): Promise<ResolvedAddress | null> {
-  const base = `address_number=${Number(a.number)} AND street_name=${q(a.street)}`;
-  let rows = await soql<AddrRow>('ramy-di5m', { where: a.type ? `${base} AND street_type=${q(a.type)}` : base, limit: 500 }, { label: 'parcel' });
-  if (!rows.length && a.type) rows = await soql<AddrRow>('ramy-di5m', { where: base, limit: 500 }, { label: 'parcel' });
+  // "Saint Francis" and "St Francis" are both written; try the other spelling when the first finds nothing.
+  const alias = /^SAINT /.test(a.street) ? a.street.replace(/^SAINT /, 'ST ') : /^ST /.test(a.street) ? a.street.replace(/^ST /, 'SAINT ') : null;
+  const names = [a.street, ...(alias ? [alias] : [])];
+  let rows: AddrRow[] = [];
+  for (const name of names) {
+    const base = `address_number=${Number(a.number)} AND street_name=${q(name)}`;
+    rows = await soql<AddrRow>('ramy-di5m', { where: a.type ? `${base} AND street_type=${q(a.type)}` : base, limit: 500 }, { label: 'parcel' });
+    if (!rows.length && a.type) rows = await soql<AddrRow>('ramy-di5m', { where: base, limit: 500 }, { label: 'parcel' });
+    if (rows.length) break;
+  }
   if (!rows.length) return null;
-  // Several street types can share a name (Carmelita St vs a Carmelita Ave elsewhere): keep the most common type.
+  // Several street types can share a name (Carmelita St vs a Carmelita Ave elsewhere): the written type when it
+  // exists here, otherwise the most common one ("Blvd" written for what the city calls a Way still resolves).
   const types = new Map<string, number>();
   for (const r of rows) types.set(r.street_type ?? '', (types.get(r.street_type ?? '') ?? 0) + 1);
-  const type = a.type ?? [...types.entries()].sort((x, y) => y[1] - x[1])[0][0];
+  const type = a.type && types.has(a.type) ? a.type : [...types.entries()].sort((x, y) => y[1] - x[1])[0][0];
   rows = rows.filter((r) => (r.street_type ?? '') === (type ?? ''));
+  if (!rows.length) return null;
   const baseIds = [...new Set(rows.map((r) => r.eas_baseid).filter(Boolean) as string[])];
   // Every unit on the base address, including condo units on other parcels.
   if (baseIds.length) {
