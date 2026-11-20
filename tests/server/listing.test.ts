@@ -149,3 +149,12 @@ describe('SF unit phrasing', () => {
     expect(readListingRegex('Legal 2nd unit downstairs, 600 Clement St').adu).toBe('legal');
   });
 });
+
+describe('bare typed addresses', () => {
+  it('reads them without a street type and without the model', async () => {
+    const r = await readListing('301 mission #45e');
+    expect(r).toMatchObject({ ok: true, claims: { address: '301 Mission #45E' } });
+    expect(await readListing('57 carmelita')).toMatchObject({ ok: true, claims: { address: '57 Carmelita' } });
+    expect((await readListing('hello world')).ok).toBe(false);
+  });
+});

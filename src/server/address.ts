@@ -149,11 +149,18 @@ export function parcelDisplay(parcels: ParcelRef[]): string {
 }
 
 /** For a model-returned address with no street type ("1200 Cole"): number + name; the resolver then matches any type. */
-export function parseAddressLoose(s: string): ParsedAddress | null {
-  const strict = parseAddress(s);
+export function parseAddressLoose(input: string): ParsedAddress | null {
+  const strict = parseAddress(input);
   if (strict) return strict;
-  const m = s.trim().match(/^(\d{1,5})([A-Za-z])?\s+([A-Za-z0-9][A-Za-z0-9 .'-]{1,40}?)\s*(?:,|$)/);
+  // "301 mission #45e, sf": take the unit and the city off, then number + name.
+  let s = input.trim();
+  const um = s.match(/\s*(?:#|\bunit\s+|\bapt\.?\s+|\bsuite\s+)\s*([A-Za-z0-9-]{1,6})\b/i);
+  const unit = um ? um[1].toUpperCase() : null;
+  if (um) s = s.slice(0, um.index) + s.slice(um.index! + um[0].length);
+  s = s.replace(/[,\s]+(?:san francisco|sf|s\.f\.)\b.*$/i, '').replace(/[,\s]+(?:ca|california)\b.*$/i, '').trim();
+  const m = s.match(/^(\d{1,5})([A-Za-z])?\s+([A-Za-z0-9][A-Za-z0-9 .'-]{1,40}?)\s*(?:,|$)/);
   if (!m) return null;
   const street = m[3].trim().toUpperCase().replace(/\s+/g, ' ');
-  return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit: null };
+  if (NOT_STREET.test(street)) return null;
+  return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit };
 }

@@ -107,6 +107,11 @@ export async function readListing(text: string): Promise<ListingResult> {
   if (clean.length < 8) return { ok: false, kind: 'invalid' };
   if (namesOtherCity(clean) && !SF.test(clean.replace(/south san francisco/ig, ''))) return { ok: false, kind: 'outside_sf' };
   const regex = readListingRegex(clean);
+  // A bare typed address ("57 carmelita", "301 mission #45e"): no street type to anchor the regex, nothing for the
+  // model to add. Read it directly; the resolver matches any street type.
+  const bare = clean.length <= 80 && !/\n/.test(clean) && !/\$|\b(bed|bath|bd|ba|br|sq|units?|price)\b/i.test(clean) ? parseAddressLoose(clean) : null;
+  if (!regex.address && bare) regex.address = `${bare.display}${bare.unit ? ` #${bare.unit}` : ''}`;
+  if (bare) return { ok: true, claims: regex, agentEmail: null };
   const agentEmail = clean.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0] ?? null; // no trailing sentence period
   const missing = !regex.address || regex.price == null || (regex.beds == null && regex.baths == null);
   if (!missing) return { ok: true, claims: regex, agentEmail };
