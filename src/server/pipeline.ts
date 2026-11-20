@@ -7,6 +7,7 @@ import { fetchers, type Raw } from './sources';
 import { saveReport } from './store';
 import { writeProse } from './writer';
 import { FetchError } from './http';
+import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
 
 /**
  * The run: listing -> parcel -> parallel fetchers (each a live step) -> rules -> writer -> report.
@@ -16,7 +17,7 @@ import { FetchError } from './http';
 
 type Emit = (e: StreamEvent) => void | Promise<void>;
 
-const STEPS: Record<Exclude<StepKey, 'zoning'>, { glyph: Glyph; title: string }> = {
+const STEPS: Record<Exclude<StepKey, 'zoning'> | 'packet', { glyph: Glyph; title: string }> = {
   parcel: { glyph: 'parcel', title: 'Found the parcel' },
   roll: { glyph: 'roll', title: "Read the assessor's roll" },
   permits: { glyph: 'permit', title: 'Read building permits' },
@@ -27,6 +28,7 @@ const STEPS: Record<Exclude<StepKey, 'zoning'>, { glyph: Glyph; title: string }>
   hazards: { glyph: 'hazard', title: 'Checked hazard zones' },
   nearby: { glyph: 'nearby', title: 'Read projects nearby' },
   money: { glyph: 'money', title: 'Worked out taxes and fees' },
+  packet: { glyph: 'packet', title: 'Read the disclosure packet' },
 };
 const FAIL_REASON: Record<string, string> = {
   roll: "Couldn't reach the assessor's roll", permits: "Couldn't reach DBI permits", trade_permits: "Couldn't reach DBI plumbing and electrical permits",
@@ -45,7 +47,7 @@ function step(id: keyof typeof STEPS, status: StepEvent['status'], extra: Partia
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
-export interface RunOpts { now?: Date; closing?: Date; reportId?: string; save?: boolean; write?: boolean; signal?: AbortSignal }
+export interface RunOpts { packetFileId?: string; now?: Date; closing?: Date; reportId?: string; save?: boolean; write?: boolean; signal?: AbortSignal }
 
 export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = {}): Promise<Report | null> {
   const fail = async (error: ApiError) => { await emit({ type: 'error', error }); return null; };
@@ -66,7 +68,8 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   const reportId = opts.reportId ?? newReportId(addr.display);
   await emit({ type: 'run', runId: `run-${randomBytes(4).toString('hex')}`, reportId, address: addr.display });
 
-  const order: Array<keyof typeof STEPS> = ['parcel', 'roll', 'permits', 'trade_permits', 'complaints', 'planning', 'tenants', 'hazards', 'nearby', 'money'];
+  const packet = opts.packetFileId ? await loadPacket(opts.packetFileId) : null;
+  const order: Array<keyof typeof STEPS> = ['parcel', 'roll', 'permits', 'trade_permits', 'complaints', 'planning', 'tenants', 'hazards', 'nearby', 'money', ...(opts.packetFileId ? ['packet' as const] : [])];
   for (const id of order) await emit(step(id, 'running'));
   const units = addr.units.filter((u) => !u.includes('#')).slice(0, 2);
   await emit(step('parcel', 'done', { detail: [parcelDisplay(addr.parcels), ...units].join(units.length ? ' and ' : '').replace(/ and (.*) and /, ', $1 and ') }));
@@ -112,6 +115,23 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
 
   const now = opts.now ?? new Date();
   let report = buildReport({ listingText, claims: listing.claims, agentEmail: listing.agentEmail, addr: a, raw, failed, now, reportId, closing: opts.closing });
+  if (opts.packetFileId) {
+    if (!packet) {
+      report.sections.packet = { state: 'error', source: 'Disclosure packet', retryable: false };
+      await emit(step('packet', 'failed', { reason: "Couldn't read the disclosure packet", retryable: false }));
+    } else {
+      try {
+        const facts = await readPacketFacts(packet.pages);
+        const { rows, sources } = reconcilePacket(report, facts, opts.packetFileId);
+        report = { ...report, ledger: [...report.ledger, ...rows], sources: [...report.sources, ...sources],
+          sections: { ...report.sections, packet: rows.length ? { state: 'ok' } : { state: 'empty', text: 'The packet states no counts to compare' } } };
+        await emit(step('packet', 'done', { detail: `${packet.pages.length} pages, ${rows.length} claim${rows.length === 1 ? '' : 's'} compared` }));
+      } catch (e) {
+        report.sections.packet = { state: 'error', source: 'Disclosure packet', retryable: true };
+        await emit(step('packet', 'failed', { reason: "Couldn't read the disclosure packet", retryable: true }));
+      }
+    }
+  }
   await emit(step('money', 'done', { detail: listing.claims.price ? 'At the asking price' : 'At the assessed value' }));
   // Progress only once no step is running.
   await emit({ type: 'progress', text: 'Comparing with the listing' });

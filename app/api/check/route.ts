@@ -21,7 +21,7 @@ export async function POST(req: Request): Promise<Response> {
       const ping = setInterval(() => { if (!closed) try { controller.enqueue(enc.encode(': ping\n\n')); } catch { closed = true; } }, 10_000);
       try {
         if (!listingText.trim()) emit({ type: 'error', error: { kind: 'invalid', retryable: false, field: 'listingText' } });
-        else await runCheck(listingText, emit);
+        else await runCheck(listingText, emit, { packetFileId: typeof body.packetFileId === 'string' ? body.packetFileId : undefined });
       } catch (e) {
         emit({ type: 'error', error: { kind: 'unavailable', retryable: true, reference: Math.random().toString(36).slice(2, 10).toUpperCase(), debug: String((e as Error)?.message ?? e) } });
       } finally {
