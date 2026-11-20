@@ -48,3 +48,11 @@ describe('unit spellings', () => {
     expect(parseAddress('1 Main St #1504 SF')).toMatchObject({ unit: '1504' });
   });
 });
+
+describe('prices without a dollar sign', () => {
+  it('reads "asking 799k" and "asking 1.2M"', async () => {
+    const { readListingRegex: regexListing } = await import('../../src/server/listing');
+    expect(regexListing('450 Vallejo St sf, 1br/1ba condo asking 799k').price).toBe(799000);
+    expect(regexListing('1 Main St, SF. 2 bed, asking 1.2M').price).toBe(1200000);
+  });
+});
