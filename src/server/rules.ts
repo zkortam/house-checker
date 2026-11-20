@@ -85,7 +85,8 @@ export function buildReport(input: RuleInput): Report {
   const lien = latestYear ? `${latestYear}-01-01` : null;
   const yearBuilt = n(roll?.year_property_built) || null;
   const lotSqft = n(roll?.lot_area) || null;
-  const rollUnits = n(roll?.number_of_units);
+  // On a residential roll row (SRES/MRES) 0 units is a blank field, not "no housing".
+  const rollUnits = /^(SRES|MRES)$/.test(roll?.use_code ?? '') ? n(roll?.number_of_units) || null : n(roll?.number_of_units);
   // The roll writes 0 when it has no count: "0 baths" on a home means not recorded, not none.
   const rollBaths = n(roll?.number_of_bathrooms) || null;
   const rollBeds = n(roll?.number_of_bedrooms) || null;
@@ -753,7 +754,10 @@ export function buildReport(input: RuleInput): Report {
   const missed = (['permits', 'complaints', 'planning'] as const).filter((k) => failed.has(k));
   const unsafeNov = novs.find((v) => v.unsafe_building === 'Y' && /^active/i.test(v.status ?? ''));
   const unsafeRow = unsafeNov ? active.find((a) => a.complaint_number === unsafeNov.complaint_number) ?? unsafeNov : null;
-  const answerBase = ruleAnswer({ unsafe: unsafeRow, multiParcel, unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
+  const useDef = lower(roll?.property_class_code_definition ?? '');
+  const useText = roll && !/^(SRES|MRES)$/.test(roll.use_code ?? '') && useDef
+    ? (/vacant lot/.test(useDef) ? 'vacant lot' : /residen|dwelling|flat|apartment|condo/.test(useDef) ? null : useDef) : null;
+  const answerBase = ruleAnswer({ useText, unsafe: unsafeRow, multiParcel, unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
   const missedNote = missed.length ? ` ${missed.map((k) => ({ permits: 'Building permits', complaints: 'City complaints', planning: 'Planning records' })[k]).join(' and ')} couldn't be read this time.` : '';
   const answer = (answerBase + missedNote).length <= 220 ? answerBase + missedNote : answerBase;
   const drafts = ruleDrafts({ addr, unknowns, cases, openPlanning, lastUnitPermit, unitCfc, agentEmail: input.agentEmail, permits, ledger, active, hotelStart, trade: multiParcel ? [] : [...plumbing, ...electrical], listingText: input.listingText });
@@ -798,10 +802,13 @@ function claimList(rows: ClaimRow[]): string {
   return `${list}${refs ? ' ' + refs : ''}`;
 }
 
-function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: number; unitLegalized: boolean; lastUnitPermit: Row | null; unitCfc: Row | null; rollSrc: ReturnType<typeof S.roll> | null; ledger: ClaimRow[]; cases: CaseRow[]; c: (...s: any[]) => string; tone: string; active: Row[]; aduRow?: ClaimRow }): string {
+function ruleAnswer(x: { useText?: string | null; unsafe?: Row | null; multiParcel: boolean; unitsNow: number; unitLegalized: boolean; lastUnitPermit: Row | null; unitCfc: Row | null; rollSrc: ReturnType<typeof S.roll> | null; ledger: ClaimRow[]; cases: CaseRow[]; c: (...s: any[]) => string; tone: string; active: Row[]; aduRow?: ClaimRow }): string {
   const unitsWord = x.unitsNow === 1 ? 'one-unit' : `${word(x.unitsNow)}-unit`;
   // "A two-unit home", "An 83-unit building", "A property with no housing units on record".
-  const desc = x.unitsNow <= 0 ? 'property with no housing units on record' : `${unitsWord} ${x.unitsNow >= 5 ? 'building' : 'home'}`;
+  // A non-residential parcel says what the assessor calls it: "A parcel the assessor lists as a parking lot [1]".
+  const desc = x.unitsNow <= 0
+    ? (x.useText ? `parcel the assessor lists as ${/^[aeiou]/i.test(x.useText) ? 'an' : 'a'} ${x.useText}${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}` : 'property with no housing units on record')
+    : `${unitsWord} ${x.unitsNow >= 5 ? 'building' : 'home'}`;
   const A = `${/^(8|11-|18-|eight|eleven|eighteen)/i.test(desc) ? 'An' : 'A'} ${desc}`;
   if (x.multiParcel) {
     const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
@@ -823,7 +830,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${claimList(problems)}.`;
   // Only say "match the listing" when the listing claimed something the records confirm.
   const roll = x.rollSrc ? ' ' + x.c(x.rollSrc) : '';
-  if (!x.ledger.length) return `${A} on record${roll}, with no open city complaints.`;
+  if (!x.ledger.length) return `${A}${/on record$/.test(A) || /\]$/.test(A) ? '' : ' on record'}${/\]$/.test(A) ? '' : roll}, with no open city complaints.`;
   const unsettled = x.ledger.filter((r) => !MATCHED.includes(r.label));
   if (unsettled.length) return `${A}. ${unsettled.length === x.ledger.length ? 'City records' : 'Other claims match, but city records'} don't settle ${claimList(unsettled)}.`;
   return `${A} whose records match the listing${roll}.`;
