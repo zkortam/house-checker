@@ -8,6 +8,7 @@ import {
   Systems, sectionId, type AskAction,
 } from './sections';
 import { BookFlow, EmailDialog } from './actions';
+import { track } from '../analytics';
 
 export function scrollToId(id: string) {
   const el = document.getElementById(id);
@@ -22,7 +23,10 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
   const [visit, setVisit] = useState<Unknown | null>(null);
   const toast = useToast();
 
-  const added = (e: ActionLogEntry) => setLog((xs) => (xs.some((x) => x.id === e.id) ? xs : [...xs, e]));
+  const added = (e: ActionLogEntry) => {
+    track(e.kind === 'book_specialist' ? 'specialist_requested' : 'email_sent', { kind: e.kind });
+    setLog((xs) => (xs.some((x) => x.id === e.id) ? xs : [...xs, e]));
+  };
 
   function onAction(a: AskAction) {
     if (a.kind === 'book') setVisit(a.unknown);
@@ -38,7 +42,7 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
   return (
     <>
       <div className="column report cascade">
-        <Glance tiles={report.glance} costs={report.costs} onJump={(k) => scrollToId(sectionId(k))} />
+        <Glance tiles={report.glance} costs={report.costs} onJump={(k) => { track('tile_tapped', { section: k }); scrollToId(sectionId(k)); }} />
         <Highlights good={report.highlights.good} watch={report.highlights.watch} />
 
         {show('unknowns', report.unknowns.length) ? (

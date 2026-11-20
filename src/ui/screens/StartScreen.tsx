@@ -9,6 +9,7 @@ import { uploadPacket } from '../api';
 import { startRun } from '../lib/run-store';
 import { errorText } from '../lib/errors';
 import { AppShell } from '../components/AppShell';
+import { track } from '../analytics';
 
 const DRAFT_KEY = 'hc-draft';
 
@@ -50,6 +51,7 @@ export function StartScreen() {
       if (up.ok) packetFileId = up.value.packetFileId;
     }
     const failStep = new URLSearchParams(location.search).get('fail') ?? undefined;
+    track('check_started', { packet: !!packet });
     const r = await startRun(t, { packetFileId, failStep });
     setBusy(false);
     if ('reportId' in r) router.push(`/check/${encodeURIComponent(r.reportId)}`);

@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ApiError, Report, StepEvent } from '@contract/types';
 import { S, fill } from '../strings.en';
@@ -13,6 +13,7 @@ import { ReportView } from '../report/ReportView';
 import { Verdict, stepsSummary } from '../report/sections';
 import { SourceSheet } from '../report/actions';
 import { AppShell } from '../components/AppShell';
+import { track } from '../analytics';
 
 export function CheckScreen({ id }: { id: string }) {
   const router = useRouter();
@@ -45,7 +46,14 @@ export function CheckScreen({ id }: { id: string }) {
     if ('reportId' in r && r.reportId !== id) router.replace(`/check/${encodeURIComponent(r.reportId)}`);
   }, [live, id, router]);
 
-  const openSource = useCallback((n: number) => setSrc(n), []);
+  const openSource = useCallback((n: number) => { setSrc(n); track('source_opened', { n }); }, []);
+  const shownFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!report || shownFor.current === report.id) return;
+    shownFor.current = report.id;
+    const failed = Object.values(report.sections).filter((x) => x.state === 'error').length;
+    track('report_shown', { decision: report.decision.tone, failedSections: failed, live: !!live });
+  }, [report, live]);
 
   const streaming = !!live && live.status === 'running';
   const answer = report?.answer ?? live?.answer ?? '';
