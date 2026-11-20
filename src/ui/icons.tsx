@@ -4,7 +4,7 @@ import {
   MapPinArea, Receipt, FileText, Drop, Lightning, Megaphone, WarningOctagon, ClipboardText, Warning, CurrencyDollar,
   Users, MapTrifold, TrendUp, MapPin, HouseLine, Wall, Question, SealCheck, Paperclip, Waves, Mountains, Bathtub,
   ArrowLeft, ShareNetwork, Sun, Moon, X, CaretDown, Clock, XCircle, CheckCircle, Envelope, CalendarCheck,
-  CircleNotch, ArrowSquareOut, Star, ThumbsUp, Eye, Info, Check, Copy, Buildings, WarningCircle, Calculator,
+  CircleNotch, ArrowSquareOut, GearSix, Star, ThumbsUp, Eye, Info, Check, Copy, Buildings, WarningCircle, Calculator,
   type Icon,
 } from '@phosphor-icons/react';
 
@@ -41,7 +41,7 @@ export const UI = {
   same: CheckCircle, pending: Clock, different: XCircle, unknown: Question,
   email: Envelope, book: CalendarCheck, spinner: CircleNotch, external: ArrowSquareOut, ai: Star,
   good: ThumbsUp, watch: Eye, info: Info, done: Check, copy: Copy, city: Buildings, failed: WarningCircle,
-  attach: Paperclip, house: HouseLine, open: WarningOctagon, cost: Calculator, ask: Question,
+  attach: Paperclip, house: HouseLine, settings: GearSix, open: WarningOctagon, cost: Calculator, ask: Question,
 } satisfies Record<string, Icon>;
 
 export function G({ glyph, size, className }: { glyph: Glyph; size?: number; className?: string }) {

@@ -22,7 +22,7 @@ try{rm=localStorage.getItem('hc-reduce-motion')}catch(e){rm=null}
 try{fs=localStorage.getItem('hc-font-size')}catch(e){fs=null}
 var s=p==='light'||p==='dark'?p:p==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):'dark';
 d.setAttribute('data-theme',s);d.setAttribute('data-theme-scheme',s);d.style.colorScheme=s;
-if(rm==='1'||matchMedia('(prefers-reduced-motion: reduce)').matches)d.classList.add('reduce-motion');
+if(rm==='1'||(rm!=='0'&&matchMedia('(prefers-reduced-motion: reduce)').matches))d.classList.add('reduce-motion');
 if(fs==='small'||fs==='large')d.setAttribute('data-font-size',fs);})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
