@@ -42,6 +42,8 @@ export const S = {
   previewText: 'Approved, tax roll behind. Property tax $1,630 a month.',
 
   // Start
+  aerialAlt: 'Satellite view of {address}',
+  aerialCredit: 'Imagery: Esri, Maxar, Earthstar Geographics',
   navCheck: 'Check',
   navRecent: 'Recent',
   navSettings: 'Settings',

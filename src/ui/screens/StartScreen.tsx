@@ -103,12 +103,7 @@ export function StartScreen() {
             </div>
           </div>
           <div className="prompt-under" aria-live="assertive">
-            {error ? <span className="field-error" id="fieldError" role="alert">{error}</span> : (
-              <span className="examples" role="group" aria-label={S.examplesLabel}>
-                <button type="button" className="text-action" onClick={() => fillExample('2055-42nd-ave')}>{S.example2055}</button>
-                <button type="button" className="text-action" onClick={() => fillExample('57-carmelita-st')}>{S.example57}</button>
-              </span>
-            )}
+            {error ? <span className="field-error" id="fieldError" role="alert">{error}</span> : null}
           </div>
         </form>
         {recent && recent.length ? (

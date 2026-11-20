@@ -716,3 +716,23 @@ html { scroll-padding-top: 16px; }
 .recent-card.flag .rc-title { color: var(--error-ink); }
 .rc-date { margin-top: auto; font-size: calc(12px * var(--font-scale)); color: var(--text-muted); }
 .prompt textarea.field { field-sizing: content; height: auto; min-height: 84px; max-height: 260px; overflow-y: auto; }
+
+/* Studio canvas: the theme gradient with one soft light at the top */
+:root { --glow-rgb: 37 99 235; --canvas-gradient: linear-gradient(135deg, #050508 0%, #0b0916 100%); --glow: rgb(var(--glow-rgb) / 0.16); }
+:root[data-theme="light"] { --canvas-gradient: linear-gradient(135deg, #ffffff 0%, #eef0f7 100%); --glow: rgb(99 102 241 / 0.10); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --canvas-gradient: linear-gradient(135deg, #ffffff 0%, #eef0f7 100%); --glow: rgb(99 102 241 / 0.10); } }
+body:has(.page) { background: radial-gradient(circle at 50% 22%, var(--glow), transparent 60%), var(--canvas-gradient); background-attachment: fixed; min-height: 100svh; }
+.page-title { font-size: calc(28px * var(--font-scale)); letter-spacing: -0.03em; font-weight: 650; }
+.page.start { gap: var(--sp-6); padding-top: clamp(32px, 16vh, 160px); }
+.prompt { background: color-mix(in srgb, var(--surface-card) 82%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* Aerial banner on the report */
+.aerial { position: relative; margin: 0 0 var(--sp-6); height: clamp(180px, 26vw, 300px); border-radius: 28px; overflow: hidden; background: var(--surface-card); }
+.aerial img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity var(--dur-slow) var(--ease-gentle); }
+.aerial.on img { opacity: 1; }
+.aerial-pin { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 0.35), 0 2px 10px rgb(0 0 0 / 0.5); opacity: 0; transition: opacity var(--dur-slow); }
+.aerial.on .aerial-pin { opacity: 1; }
+.aerial figcaption { position: absolute; inset-inline-end: 12px; bottom: 10px; font-size: calc(11px * var(--font-scale)); color: rgb(255 255 255 / 0.85); text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); }
+@media (max-width: 743px) { .aerial { border-radius: 20px; margin-bottom: var(--sp-4); } }
+.page.start .page-title, .page .page-title { font-size: calc(28px * var(--font-scale)); line-height: 1.15; letter-spacing: -0.025em; font-weight: 650; text-align: start; }
