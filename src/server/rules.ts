@@ -307,7 +307,7 @@ export function buildReport(input: RuleInput): Report {
           const w = shortWhat(a.complaint_description, '');
           const about: Record<string, string> = { reroof: 'roofing work', baths: 'bathroom work', kitchen: 'kitchen work', remodel: 'a remodel', ADU: 'an ADU', 'ADU legalization': 'an ADU',
             foundation: 'foundation work', 'illegal unit': 'an illegal unit', demolition: 'demolition', 'sewer lateral': 'the sewer lateral', excavation: 'excavation', 'bedroom to office': 'a room conversion' };
-          return about[w] ? `Complaint about ${about[w]}` : 'Open complaint';
+          return about[w] ? `Complaint about ${about[w]}` : year(a.date_filed) ? `Open complaint from ${year(a.date_filed)}` : 'Open complaint';
         })();
     const flags = [nov?.unsafe_building === 'Y' ? 'as an unsafe building' : '', nov?.work_without_permit === 'Y' ? 'work without a permit' : '', nov?.additional_work_beyond_permit === 'Y' ? 'work beyond the permit' : ''].filter(Boolean);
     cases.push({
@@ -641,12 +641,15 @@ export function buildReport(input: RuleInput): Report {
     for (const x of cases) if (!grouped.has(x)) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${ref1(x.text)}`.trim() : `${x.title} ${ref1(x.text)}`.trim());
   }
   if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden in-law' : 'in-law unit'} ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
-  if (caseFee) watch.push(`Open complaints cost ${money(caseFee)} a month in fees ${c(S.dbiFees())}`);
+  if (caseFee) {
+    const one = active.length + activeNovs.length === 1;
+    watch.push(`${one ? 'The open complaint' : 'Open complaints'}${multiParcel ? ' at the building' : ''} ${one ? 'costs' : 'cost'} ${money(caseFee)} a month in fees ${c(S.dbiFees())}`);
+  }
   for (const r of ledger.filter((r) => r.label === 'permitted_not_finaled')) watch.push(`${r.title} permitted, not signed off ${r.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   for (const b of buyouts.slice(0, 1)) {
     const amt = n(b.buyout_amount); const t = n(b.number_of_tenants);
     const who = t ? `${t} tenant${t === 1 ? '' : 's'}` : 'tenants';
-    watch.push(`Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}${multiParcel ? ' in the building' : ''}: ${amt ? money(amt) : 'paid'} to ${who} ${c(S.buyout(b, addr.display, addrUpper))}`);
+    watch.push(`Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}${multiParcel ? ' in the building' : ''}${amt ? `: ${money(amt)} to ${who}` : t ? ` with ${who}` : ''} ${c(S.buyout(b, addr.display, addrUpper))}`);
   }
   if (hotel.length) watch.push(`Hotel-tax registration since ${year(hotelStart)}, a sign of short-term rentals ${c(hotelSrc)}`);
   for (const h of notes) watch.push(h.key === 'reservoir' ? `Inside the ${hz?.reservoirs?.length === 2 && hz.reservoirs.every((r) => /^Sunset/.test(r)) ? 'Sunset' : (hz?.reservoirs ?? []).join(' and ')} reservoirs failure zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
