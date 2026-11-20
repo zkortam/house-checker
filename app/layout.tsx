@@ -17,9 +17,9 @@ export const viewport: Viewport = {
 
 /* Blocking boot: theme, reduced motion and font size before first paint. Three independent try blocks. */
 const BOOT = `(function(){var d=document.documentElement,p=null,rm=null,fs=null;
-try{p=localStorage.getItem('hc-theme')}catch(e){}
-try{rm=localStorage.getItem('hc-reduce-motion')}catch(e){}
-try{fs=localStorage.getItem('hc-font-size')}catch(e){}
+try{p=localStorage.getItem('hc-theme')}catch(e){p=null}
+try{rm=localStorage.getItem('hc-reduce-motion')}catch(e){rm=null}
+try{fs=localStorage.getItem('hc-font-size')}catch(e){fs=null}
 var s=p==='light'||p==='dark'?p:p==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):'dark';
 d.setAttribute('data-theme',s);d.setAttribute('data-theme-scheme',s);d.style.colorScheme=s;
 if(rm==='1'||matchMedia('(prefers-reduced-motion: reduce)').matches)d.classList.add('reduce-motion');

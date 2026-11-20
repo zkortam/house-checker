@@ -289,12 +289,18 @@ export function Systems({ rows }: { rows: SystemRow[] }) {
 /* ---------- Info rows: tenants, upside, nearby ---------- */
 
 export function InfoList({ rows }: { rows: InfoRow[] }) {
+  return <Card>{rows.map((r, i) => <InfoItem key={i} row={r} />)}</Card>;
+}
+
+function InfoItem({ row }: { row: InfoRow }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
   return (
-    <Card>
-      {rows.map((r, i) => (
-        <Row key={i} className={r.muted ? 'muted-row' : undefined} lead={<G glyph={r.glyph} />} title={r.title} sub={<Cited text={r.text} />} />
-      ))}
-    </Card>
+    <div className={row.muted ? 'muted-row' : undefined}>
+      <Row onClick={() => setOpen(!open)} expanded={open} controls={id} lead={<G glyph={row.glyph} />} title={row.title}
+        end={<U name="caret" className="caret" />} />
+      <Collapse open={open} id={id}><p className="evidence"><span><Cited text={row.text} /></span></p></Collapse>
+    </div>
   );
 }
 

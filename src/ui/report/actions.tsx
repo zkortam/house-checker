@@ -15,7 +15,7 @@ export function SourceSheet({ source, n, onClose }: { source: Source | null; n: 
       foot={source ? (
         <>
           <Button kind="text" onClick={onClose}>{S.close}</Button>
-          {source.url ? <LinkButton href={source.url} icon="external">{S.openRecord}</LinkButton> : null}
+          {source.url ? <LinkButton href={source.url}>{S.openRecord}</LinkButton> : null}
         </>
       ) : null}>
       {source ? (
