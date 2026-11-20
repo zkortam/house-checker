@@ -16,6 +16,7 @@ const ADDRESS_RE = new RegExp(
 );
 
 function title(s: string): string {
+  s = s.replace(/^0+(\d)/, '$1'); // DataSF writes 06TH; people write 6th
   return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n, o) => n + o.toLowerCase());
 }
 

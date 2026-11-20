@@ -727,13 +727,17 @@ function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: Case
   const qs: string[] = [];
   const ids: string[] = [];
   const add = (id: string, q: string) => { if (x.unknowns.some((u) => u.id === id)) { qs.push(q); ids.push(id); } };
-  add('u-tenants', 'Is either unit currently rented? If so, what are the rents and lease terms?');
+  const tq = x.unknowns.find((u) => u.id === 'u-tenants')?.title ?? 'Is either unit rented?';
+  add('u-tenants', `${tq.replace(/ rented\?$/, ' currently rented?')} If so, what are the rents and lease terms?`);
   add('u-short-term', 'City records show a hotel-tax registration at this address. Are any short-term rental bookings scheduled after closing?');
   add('u-bedrooms', "Could you share the floor plan? Public records don't list bedrooms, and a recent permit converted one to an office.");
   add('u-garden-unit', 'What is the in-law unit, legally? I could not find a permit that creates a second unit. Does anyone live there?');
   add('u-close-cases', `Will the active complaints${x.active.length ? ` (${x.active.map((c) => c.complaint_number).join(', ')})` : ''} and open permits be closed before closing, and who pays any fees?`);
   const docs = [x.lastUnitPermit?.permit_number, ...x.permits.filter((p) => /complete/.test(p.status ?? '') && /remodel|bath|stair|adu/.test(lower(p.description)) && p !== x.lastUnitPermit).map((p) => p.permit_number)].filter(Boolean).slice(0, 2);
-  qs.push(`Could you share the 3R report${docs.length ? `, the job cards for permit${docs.length > 1 ? 's' : ''} ${docs.join(' and ')}` : ''}${x.unitCfc ? `, and the certificate of final completion for ${(x.unitCfc.building_address ?? '').replace(/\s+(Avenue|Street)$/i, '')}` : ''}?`);
+  const want = ['the 3R report',
+    ...(docs.length ? [`the job cards for permit${docs.length > 1 ? 's' : ''} ${docs.join(' and ')}`] : []),
+    ...(x.unitCfc ? [`the certificate of final completion for ${(x.unitCfc.building_address ?? '').replace(/\s+(Avenue|Street)$/i, '')}`] : [])];
+  qs.push(`Could you share ${want.length < 3 ? want.join(' and ') : `${want.slice(0, -1).join(', ')}, and ${want[want.length - 1]}`}?`);
   if (x.openPlanning[0]) qs.push(`Do you know whether Planning has closed enforcement case ${x.openPlanning[0].record_id}?`);
   const listingAgentEmail: EmailDraft | null = qs.length ? {
     to: x.agentEmail, subject: `Questions about ${a}`,
