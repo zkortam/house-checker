@@ -157,3 +157,20 @@ export function parseAddressLoose(s: string): ParsedAddress | null {
   const street = m[3].trim().toUpperCase().replace(/\s+/g, ' ');
   return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit: null };
 }
+
+/** For an address the city has no record of: up to 3 real numbers on the same street, closest first. */
+export async function nearbyAddresses(a: ParsedAddress): Promise<string[]> {
+  const n = Number(a.number);
+  if (!Number.isFinite(n)) return [];
+  const base = `street_name=${q(a.street)} AND address_number between ${Math.max(0, n - 80)} and ${n + 80}`;
+  const rows = await soql<{ address_number: string; street_type?: string }>('ramy-di5m',
+    { where: a.type ? `${base} AND street_type=${q(a.type)}` : base, select: 'address_number,street_type', limit: 400 }, { label: 'parcel' }).catch(() => []);
+  const seen = new Set<string>();
+  return rows
+    .map((r) => ({ num: Number(r.address_number), type: r.street_type ?? a.type }))
+    .filter((r) => Number.isFinite(r.num) && r.num !== n)
+    .sort((x, y) => Math.abs(x.num - n) - Math.abs(y.num - n) || x.num - y.num)
+    .map((r) => `${r.num} ${title(a.street)}${r.type ? ' ' + (TYPE_DISPLAY[r.type] ?? title(r.type)) : ''}`)
+    .filter((d) => (seen.has(d) ? false : (seen.add(d), true)))
+    .slice(0, 3);
+}

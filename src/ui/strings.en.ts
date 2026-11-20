@@ -101,7 +101,8 @@ export const S = {
   // Errors by ApiError kind
   errInvalid: 'Enter a street address in San Francisco',
   errOutsideSf: 'This address is outside San Francisco',
-  errAddressNotFound: 'No San Francisco parcel matches this address. Check the street number and name.',
+  errAddressNotFound: 'The city has no record of this address. Check the street number and name.',
+  closestOnRecord: 'Closest on record',
   errNotFound: 'No report with this link. It may have expired.',
   errOffline: "You're offline. Retry when you're back",
   errTimeout: 'The city records took too long to answer. Retry in a minute.',

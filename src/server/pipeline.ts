@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import type { ApiError, Glyph, Report, StepEvent, StreamEvent } from '../contract/types';
-import { parseAddress, parseAddressLoose, parcelDisplay, resolveAddress, type ResolvedAddress } from './address';
+import { parseAddress, parseAddressLoose, parcelDisplay, nearbyAddresses, resolveAddress, type ResolvedAddress } from './address';
 import { readListing } from './listing';
 import { buildReport, fmtDate, type StepKey } from './rules';
 import { fetchers, type Raw } from './sources';
 import { saveReport, trackRun } from './store';
 import { writeProse } from './writer';
+import { applyPolish, polishText } from './polish';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
 import { readPermits } from './permit-reader';
@@ -66,7 +67,10 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
     const kind = e instanceof FetchError && e.kind === 'timeout' ? 'timeout' : 'unavailable';
     return fail({ kind, retryable: true, reference: randomBytes(4).toString('hex').toUpperCase(), debug: String((e as Error).message) });
   }
-  if (!addr || !addr.parcels.length) return fail({ kind: 'not_found', retryable: false, field: 'listingText', debug: `no parcel for ${parsed.display}` });
+  if (!addr || !addr.parcels.length) {
+    const suggest = await nearbyAddresses(parsed);
+    return fail({ kind: 'not_found', retryable: false, field: 'listingText', debug: `no parcel for ${parsed.display}`, ...(suggest.length ? { suggest } : {}) });
+  }
 
   const reportId = opts.reportId ?? newReportId(addr.display);
   let settle: (r: Report | null) => void = () => {};
@@ -158,7 +162,10 @@ async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extra
   await emit(step('money', 'done', { detail: listing.claims.price ? 'At the asking price' : 'At the assessed value' }));
   // Progress only once no step is running.
   await emit({ type: 'progress', text: 'Comparing with the listing' });
+  // The plain-words pass runs beside the writer; both are checked and fall back to the rule text.
+  const polishing = opts.write !== false ? polishText(report).catch(() => new Map<string, string>()) : null;
   if (opts.write !== false) report = await writeProse(report);
+  if (polishing) report = applyPolish(report, await polishing);
   for (const word of report.answer.split(/(?<= )/)) await emit({ type: 'delta', text: word });
   if (opts.save !== false) await saveReport(report);
   if (opts.save !== false) sensoAfterReport(report);
