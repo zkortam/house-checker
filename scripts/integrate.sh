@@ -19,7 +19,7 @@ node scripts/demo-check.mjs | tail -1
 # Browser smoke on a fresh (uncached) address: catches client crashes the API check can't see.
 PW=/tmp/claude-1000/-home-surf-housechecker/878163fe-2e63-440f-bd2f-1c46077ebc11/scratchpad/pw
 if [ -d "$PW/node_modules/playwright" ]; then
-  (cd "$PW" && timeout 150 node /home/surf/housechecker/submission/tools/ui-smoke.mjs "$(( (RANDOM % 2000) + 100 )) Judah St, San Francisco. 2 bed 1 bath." | tail -1)
+  (cd "$PW" && timeout 150 node uncached.mjs "$(( (RANDOM % 2000) + 100 )) Judah St, San Francisco. 2 bed 1 bath." | tail -1)
 fi
 git push -q origin main
 git log --oneline -1
