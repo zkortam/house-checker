@@ -24,3 +24,11 @@ describe('listing parser (regex path)', () => {
     expect(parseAddress('2055A 42nd Ave')).toMatchObject({ number: '2055', suffix: 'A', street: '42ND', type: 'AVE' });
   });
 });
+
+describe('unit numbers', () => {
+  it('reads a condo unit after the street type', () => {
+    expect(parseAddress('301 Mission St #45E, San Francisco')).toMatchObject({ number: '301', street: 'MISSION', type: 'ST', unit: '45E' });
+    expect(parseAddress('1665 North Point St, Unit 3, SF')).toMatchObject({ unit: '3' });
+    expect(parseAddress('2055 42nd Ave, San Francisco')).toMatchObject({ unit: null });
+  });
+});

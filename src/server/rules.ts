@@ -71,7 +71,10 @@ export function buildReport(input: RuleInput): Report {
   const c = cites.c.bind(cites);
   const P = addr.parcels[0];
   const pid = P?.parcel ?? 'unknown';
-  const rollRows = (raw.roll ?? []) as RollRow[];
+  // Condos: the roll row for the listed unit's parcel (parcels[0]), not whichever unit sorts first.
+  const allRoll = (raw.roll ?? []) as RollRow[];
+  const rollRows = allRoll.some((r) => r.parcel_number === pid) ? allRoll.filter((r) => r.parcel_number === pid) : allRoll;
+  const multiParcel = addr.parcels.length > 1;
   const latestYear = rollRows.reduce((m, r) => Math.max(m, Number(r.closed_roll_year ?? 0)), 0);
   const roll = rollRows.find((r) => Number(r.closed_roll_year) === latestYear) ?? null;
   const rollSrc = roll ? S.roll(roll.parcel_number ?? pid, String(latestYear)) : null;
@@ -159,8 +162,10 @@ export function buildReport(input: RuleInput): Report {
   }
 
   // Baths
-  const finaledBaths = plumbing.filter(isComplete).map((p) => ({ p, b: bathsIn(p.description ?? '') })).filter((x) => x.b && (!lien || day(x.p.completed_date) >= `${(latestYear || 2000) - 3}-01-01`));
-  const liveBaths = plumbing.filter((p) => !isComplete(p) && /issued|filed/i.test(p.status ?? '')).map((p) => ({ p, b: bathsIn(p.description ?? '') })).filter((x) => x.b);
+  // In a multi-parcel building, trade permits are building-wide and can't be pinned to the listed unit.
+  const unitPlumbing = multiParcel ? [] : plumbing;
+  const finaledBaths = unitPlumbing.filter(isComplete).map((p) => ({ p, b: bathsIn(p.description ?? '') })).filter((x) => x.b && (!lien || day(x.p.completed_date) >= `${(latestYear || 2000) - 3}-01-01`));
+  const liveBaths = unitPlumbing.filter((p) => !isComplete(p) && /issued|filed/i.test(p.status ?? '')).map((p) => ({ p, b: bathsIn(p.description ?? '') })).filter((x) => x.b);
   if (claims.baths != null) {
     const mentioned = finaledBaths.filter((x) => !x.b!.added).reduce((s, x) => s + x.b!.count, 0);
     const added = finaledBaths.filter((x) => x.b!.added).reduce((s, x) => s + x.b!.count, 0);
@@ -192,7 +197,7 @@ export function buildReport(input: RuleInput): Report {
 
   // Sq ft
   if (claims.sqft != null) {
-    const proj = projects.filter((p) => n(p.residential_prop)).sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''))[0];
+    const proj = multiParcel ? undefined : projects.filter((p) => n(p.residential_prop)).sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''))[0];
     const projArea = proj ? n(proj.residential_prop) : null;
     const projDone = proj ? (proj.building_permits ?? '').split(/,\s*/).some((bp) => permits.some((p) => p.permit_number === bp.trim() && isComplete(p))) : false;
     const near = (a: number | null, b: number) => a != null && Math.abs(a - b) / b <= 0.1;
@@ -295,7 +300,7 @@ export function buildReport(input: RuleInput): Report {
   }
 
   // Renovation claim vs open work (only when it does not simply check out)
-  if (claims.renovations.length) {
+  if (claims.renovations.length && !multiParcel) {
     const bigLive = permits.filter(isLive).filter((p) => /remodel|renovat|slab|garage|excavat|addition/.test(lower(p.description)));
     if (bigLive.length) {
       const p = bigLive.sort((a, b) => Number(b.estimated_cost ?? 0) - Number(a.estimated_cost ?? 0))[0];

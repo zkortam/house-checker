@@ -54,7 +54,8 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   const fail = async (error: ApiError) => { await emit({ type: 'error', error }); return null; };
   const listing = await readListing(listingText);
   if (!listing.ok) return fail({ kind: listing.kind, retryable: false, field: 'listingText' });
-  const parsed = listing.claims.address ? parseAddress(listing.claims.address) : null;
+  const fromText = parseAddress(listingText);
+  const parsed = fromText && fromText.display === listing.claims.address ? fromText : listing.claims.address ? parseAddress(listing.claims.address) : null;
   if (!parsed) return fail({ kind: 'invalid', retryable: false, field: 'listingText', debug: 'no address in listing' });
 
   let addr: ResolvedAddress | null;

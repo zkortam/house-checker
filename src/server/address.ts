@@ -1,6 +1,6 @@
 import { soql, q, inList } from './http';
 
-export interface ParsedAddress { number: string; suffix: string | null; street: string; type: string | null; display: string }
+export interface ParsedAddress { number: string; suffix: string | null; street: string; type: string | null; display: string; unit?: string | null }
 
 const TYPES: Record<string, string> = {
   st: 'ST', street: 'ST', ave: 'AVE', av: 'AVE', avenue: 'AVE', blvd: 'BLVD', boulevard: 'BLVD', way: 'WAY',
@@ -27,7 +27,9 @@ export function parseAddress(text: string): ParsedAddress | null {
   const street = streetRaw.trim().replace(/\s+/g, ' ').toUpperCase();
   const type = TYPES[typeRaw.toLowerCase()] ?? null;
   const display = `${number}${suffix ? suffix.toUpperCase() : ''} ${title(street)}${type ? ' ' + TYPE_DISPLAY[type] : ''}`;
-  return { number, suffix: suffix ? suffix.toUpperCase() : null, street, type, display };
+  const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
+  const unit = after.match(/^\s*,?\s*(?:#|unit\s+|apt\.?\s+|suite\s+|no\.\s*)([A-Za-z0-9-]{1,6})\b/i)?.[1]?.toUpperCase() ?? null;
+  return { number, suffix: suffix ? suffix.toUpperCase() : null, street, type, display, unit };
 }
 
 export interface ParcelRef { parcel: string; block: string; lot: string }
@@ -35,7 +37,8 @@ export interface ParcelRef { parcel: string; block: string; lot: string }
 export interface ResolvedAddress {
   input: ParsedAddress;
   display: string;               // "2055 42nd Ave"
-  parcels: ParcelRef[];          // every parcel on the base address (condos can have many)
+  parcels: ParcelRef[];          // every parcel on the base address (condos can have many); the listed unit's parcel first
+  unit: string | null;           // "45E" when the listing names a unit
   units: string[];               // suffix and unit addresses on the base: ["2055A"]
   lat: number | null;
   lon: number | null;
@@ -73,12 +76,15 @@ export async function resolveAddress(a: ParsedAddress): Promise<ResolvedAddress 
   for (const r of rows) if (r.parcel_number && r.block && r.lot) parcels.set(r.parcel_number, { parcel: r.parcel_number, block: r.block, lot: r.lot });
   const units = [...new Set(rows.filter((r) => r.address_number_suffix || r.unit_number)
     .map((r) => `${r.address_number}${r.address_number_suffix ?? ''}${r.unit_number ? ' #' + r.unit_number : ''}`))];
-  const first = rows.find((r) => !r.address_number_suffix && !r.unit_number) ?? rows[0];
+  const unitRow = a.unit ? rows.find((r) => (r.unit_number ?? '').toUpperCase() === a.unit) : undefined;
+  const first = unitRow ?? rows.find((r) => !r.address_number_suffix && !r.unit_number) ?? rows[0];
+  const primary = first.parcel_number;
   return {
     input: a,
-    display: `${a.number} ${title(a.street)}${type ? ' ' + (TYPE_DISPLAY[type] ?? title(type)) : ''}`,
-    parcels: [...parcels.values()].sort((x, y) => x.parcel.localeCompare(y.parcel)),
+    display: `${a.number}${a.suffix ?? ''} ${title(a.street)}${type ? ' ' + (TYPE_DISPLAY[type] ?? title(type)) : ''}${unitRow ? ` #${a.unit}` : ''}`,
+    parcels: [...parcels.values()].sort((x, y) => (x.parcel === primary ? -1 : y.parcel === primary ? 1 : x.parcel.localeCompare(y.parcel))),
     units,
+    unit: unitRow ? a.unit ?? null : null,
     lat: first.latitude ? Number(first.latitude) : null,
     lon: first.longitude ? Number(first.longitude) : null,
     easBaseIds: baseIds,

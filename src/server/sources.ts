@@ -61,7 +61,9 @@ const NO_GEOM = (cols: string) => ({ select: cols });
 /** Each step's fetch. Every function throws on failure; the pipeline turns that into a failed step. */
 export const fetchers = {
   async roll(a: ResolvedAddress): Promise<RollRow[]> {
-    return soql<RollRow>('wv5m-vpq2', { where: parcelIn(a), order: 'closed_roll_year DESC', limit: 200 }, { label: 'roll' });
+    // Condos can have hundreds of parcels: the roll is read for the listed unit's parcel (parcels[0]).
+    const where = a.parcels.length > 1 ? `parcel_number=${q(a.parcels[0].parcel)}` : parcelIn(a);
+    return soql<RollRow>('wv5m-vpq2', { where, order: 'closed_roll_year DESC', limit: 200 }, { label: 'roll' });
   },
 
   async permits(a: ResolvedAddress): Promise<Pick<Raw, 'permits' | 'permitsf' | 'cfc' | 'housing'>> {
