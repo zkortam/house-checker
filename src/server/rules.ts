@@ -796,7 +796,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (x.multiParcel) {
     const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
     if (x.active.length) return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building` : 'A condo unit'} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} at the address ${x.c(...x.active.slice(0, 2).map(S.complaint))}. Ask whether ${x.active.length > 1 ? 'they involve' : 'it involves'} this unit.`;
-    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : !x.ledger.length ? `No open city complaints at the address${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.` : x.ledger.some((r) => !MATCHED.includes(r.label)) ? `City records don't settle ${claimList(x.ledger.filter((r) => !MATCHED.includes(r.label)))}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
+    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${x.tone === 'clear' && onlySize(differ) ? sizeGap(differ) : differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : !x.ledger.length ? `No open city complaints at the address${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.` : x.ledger.some((r) => !MATCHED.includes(r.label)) ? `City records don't settle ${claimList(x.ledger.filter((r) => !MATCHED.includes(r.label)))}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
   }
   if (x.unitLegalized && x.lastUnitPermit) {
     const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
@@ -807,6 +807,9 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
     return `${A} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}.${x.ledger.some((r) => r.key === 'renovation') ? ' Work is permitted but not signed off.' : ` Ask how ${x.active.length > 1 ? 'they' : 'it'} will be closed before you offer.`}`;
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
+  // With a clear verdict the only gaps are the assessor's size and bedroom figures, which often lag the house.
+  if (x.tone === 'clear' && onlySize(problems))
+    return `${A}. ${sizeGap(problems)}`;
   if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${claimList(problems)}.`;
   // Only say "match the listing" when the listing claimed something the records confirm.
   const roll = x.rollSrc ? ' ' + x.c(x.rollSrc) : '';
@@ -815,6 +818,13 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (unsettled.length) return `${A}. ${unsettled.length === x.ledger.length ? 'City records' : 'Other claims match, but city records'} don't settle ${claimList(unsettled)}.`;
   return `${A} whose records match the listing${roll}.`;
 }
+/** Only the assessor's size or bedroom figures differ: common, and worth one question, not alarm. */
+function sizeGap(rows: ClaimRow[]): string {
+  const names = rows.map((r) => (r.key === 'sqft' ? 'square footage' : 'bedroom count')).join(' and ');
+  const refs = [...new Set(rows.map((r) => r.why.match(/\[\d+\]/)?.[0]).filter(Boolean))].join('');
+  return `The assessor's ${names} ${rows.length > 1 ? 'differ' : 'differs'} from the listing${refs ? ' ' + refs : ''}, which is common in older records. Ask how the listing ${rows.length > 1 ? 'counted them' : rows[0].key === 'sqft' ? 'measured it' : 'counted them'}.`;
+}
+const onlySize = (rows: ClaimRow[]) => rows.length > 0 && rows.every((r) => r.key === 'sqft' || r.key === 'beds');
 const MATCHED: FindingLabel[] = ['matches', 'resolved', 'matches_planning', 'permitted_not_updated'];
 
 function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[]; hotelStart: string | null; trade: Row[]; listingText: string }): Report['drafts'] {

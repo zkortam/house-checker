@@ -1,5 +1,5 @@
 import type { ListingClaims } from '../contract/types';
-import { parseAddress, parseAddressLoose } from './address';
+import { bareAddress, parseAddress, parseAddressLoose } from './address';
 import { llmJson } from './llm';
 
 /**
@@ -20,7 +20,7 @@ export function namesOtherCity(text: string): boolean {
     const after = text.slice(at + m[0].length, at + m[0].length + 16);
     if (/^\s+(st|street|ave|avenue|blvd|boulevard|way|ter|terrace|pl|place|dr|drive|ct|court|ln|lane|rd|road|aly|alley|cir|plz|hwy)\b/i.test(after)) continue;
     if (/(inner|outer|central)\s+$/i.test(before)) continue;
-    if (/,\s*$|\bin\s+$/i.test(before) || /^\s*,?\s*(ca|california)\b|^\s*,?\s*9[0-5]\d{3}\b/i.test(after)) return true;
+    if (/,\s*$|\bin\s+$|\b(st|ave|blvd|way|dr|rd|ln|ct|pl|ter)\.?\s+$/i.test(before) || /^\s*,?\s*(ca|california)\b|^\s*,?\s*9[0-5]\d{3}\b|^\s*$/i.test(after)) return true;
   }
   return false;
 }
@@ -58,18 +58,18 @@ export function readListingRegex(text: string): ListingClaims {
   const N = '(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight)';
   const WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
   const count = (v: string) => (/^\d/.test(v) ? v : String(WORDS[v.toLowerCase()]));
-  const bedM = t.match(new RegExp(`\\b${N}[- ]?(?:bed(?:room)?s?|br|bd)\\b`, 'i'));
+  const bedM = t.match(new RegExp(`\\b${N}(?:-|\\s{1,3})?(?:bed(?:room)?s?|br|bd)\\b`, 'i'));
   const beds = bedM ? [bedM[0], count(bedM[1])] : /\bstudio\b/i.test(t) ? [ 'studio', '0'] : null;
-  const bathM = t.match(new RegExp(`\\b${N}[- ]?(?:full\\s+)?(?:bath(?:room)?s?|ba)\\b`, 'i'));
+  const bathM = t.match(new RegExp(`\\b${N}(?:-|\\s{1,3})?(?:full\\s+)?(?:bath(?:room)?s?|ba)\\b`, 'i'));
   const halfM = t.match(new RegExp(`\\b(one|a|1|two|2)\\s+half[- ]?bath(?:room)?s?\\b`, 'i'));
   const baths = bathM ? [bathM[0], String(Number(count(bathM[1])) + (halfM && !/\./.test(bathM[1]) && halfM.index! > bathM.index! ? (/^(two|2)$/i.test(halfM[1]) ? 1 : 0.5) : 0))] : null;
   // Living area, not the lot: skip a match with "lot" just before it or right after it.
   const sqft = [...t.matchAll(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)\.?/gi)]
-    .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^\s*(?:\w+\s+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
-  const units = t.match(/\b(\d+|two|three|four|five|six)[- ]units?\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
+    .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^[ \t]*(?:\w+[ \t]+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
+  const units = t.match(/\b(\d+|two|three|four|five|six)[- ](?:units?|flats?)\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
   let adu: ListingClaims['adu'] = null;
-  if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|junior adu|jadu)/i.test(t)) adu = 'legal';
-  else if (/\b(in-?law|adu|accessory dwelling|au pair|guest (suite|unit)|granny|second unit|junior adu|jadu)\b/i.test(t)) adu = 'claimed';
+  if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|2nd unit|junior adu|jadu)/i.test(t)) adu = 'legal';
+  else if (/\b(in-?law|adu|accessory dwelling|au pair|guest (suite|unit)|granny|second unit|2nd unit|junior adu|jadu)\b/i.test(t)) adu = 'claimed';
   const renovations: string[] = [];
   for (const [re, label] of [
     [/\b(fully |completely |newly |recently )?(remodel(?:ed)?|renovat(?:ed|ion))\b/i, 'remodeled'],
@@ -107,6 +107,11 @@ export async function readListing(text: string): Promise<ListingResult> {
   if (clean.length < 8) return { ok: false, kind: 'invalid' };
   if (namesOtherCity(clean) && !SF.test(clean.replace(/south san francisco/ig, ''))) return { ok: false, kind: 'outside_sf' };
   const regex = readListingRegex(clean);
+  // A bare typed address ("57 carmelita", "301 mission #45e"): no street type to anchor the regex, nothing for the
+  // model to add. Read it directly; the resolver matches any street type.
+  const bare = bareAddress(clean);
+  if (!regex.address && bare) regex.address = `${bare.display}${bare.unit ? ` #${bare.unit}` : ''}`;
+  if (bare) return { ok: true, claims: regex, agentEmail: null };
   const agentEmail = clean.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0] ?? null; // no trailing sentence period
   const missing = !regex.address || regex.price == null || (regex.beds == null && regex.baths == null);
   if (!missing) return { ok: true, claims: regex, agentEmail };
