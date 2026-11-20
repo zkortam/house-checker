@@ -164,3 +164,17 @@ export function parseAddressLoose(input: string): ParsedAddress | null {
   if (NOT_STREET.test(street)) return null;
   return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit };
 }
+
+/** A typed address and nothing else ("57 carmelita", "301 mission #45e, sf"). Anything after the street name other
+ *  than a unit, SF, CA or a zip ("12 Main St Novato") means it isn't bare, so the caller reads it the long way. */
+export function bareAddress(text: string): ParsedAddress | null {
+  const t = text.trim();
+  if (t.length > 80 || /\n/.test(t) || /\$|\b(bed|beds|bath|baths|bd|ba|br|sq|units?|price)\b/i.test(t)) return null;
+  const a = parseAddressLoose(t);
+  if (!a) return null;
+  const tail = t.replace(/\s*(?:#|\bunit\s+|\bapt\.?\s+|\bsuite\s+)\s*[A-Za-z0-9-]{1,6}\b/i, '')
+    .replace(/\b(?:san francisco|sf|s\.f\.|ca|california|9\d{4})\b/gi, '').replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
+  const last = (tail.split(/\s+/).pop() ?? '').toLowerCase();
+  const nameEnd = a.street.split(' ').pop()!.toLowerCase();
+  return last === nameEnd || (a.type && TYPES[last] === a.type) ? a : null;
+}
