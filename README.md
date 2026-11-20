@@ -65,7 +65,7 @@ Data lives in `.data/` (reports, 24 h cache, outbox, idempotency keys). It is gi
 |---|---|---|---|
 | ![Verdict and tiles](submission/screenshots/1-verdict-and-tiles.png) | ![Listing vs City](submission/screenshots/2-listing-vs-city.png) | ![Specialist request](submission/screenshots/3-specialist-request-confirm.png) | ![Phone](submission/screenshots/4-phone-2055.png) |
 
-Demo video: [submission/demo.mp4](submission/demo.mp4) (2:18). Submission answers: [submission/SUBMISSION.md](submission/SUBMISSION.md).
+Demo video: [submission/demo.mp4](submission/demo.mp4) (2:01). Submission answers: [submission/SUBMISSION.md](submission/SUBMISSION.md).
 
 ## Live demo
 
