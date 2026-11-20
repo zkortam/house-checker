@@ -31,7 +31,8 @@ export async function listReports(): Promise<string[]> {
 }
 
 // Serialize writes per report so two actions never overwrite each other's log entry.
-const locks = new Map<string, Promise<unknown>>();
+// One map per server process, not per route bundle: email and book run in different bundles in production.
+const locks: Map<string, Promise<unknown>> = ((globalThis as unknown as { __hcLocks?: Map<string, Promise<unknown>> }).__hcLocks ??= new Map());
 export async function appendAction(reportId: string, entry: ActionLogEntry): Promise<Report | null> {
   const prev = locks.get(reportId) ?? Promise.resolve();
   const next = prev.then(async () => {
