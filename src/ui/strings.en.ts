@@ -197,7 +197,7 @@ export const S = {
   bookConfirmScope: 'Covers: {value}',
   bookConfirmPrice: 'About {value}',
   bookConfirmPriceUnknown: 'Price set by the specialist',
-  bookConfirmEmail: 'They get an email with a calendar invite, and you get a copy.',
+  bookConfirmEmail: 'They get an email with a calendar invite and reply with a time that works.',
   noPaidPlacement: 'No paid placement',
   bookSent: 'Request sent',
   bookNotSent: "Couldn't send the request",
