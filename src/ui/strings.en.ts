@@ -77,6 +77,7 @@ export const S = {
   stepDone: 'Done',
   stepFailedShort: 'Not finished',
   starting: 'Starting the check',
+  interrupted: 'The check stopped when the page reloaded. Retry to run it again.',
   runFailed: "The check stopped before it finished. Retry to run it again.",
   loadingReport: 'Loading the report',
 

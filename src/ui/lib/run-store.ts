@@ -58,6 +58,7 @@ export function startRun(listingText: string, opts: { packetFileId?: string; fai
         switch (ev.type) {
           case 'run':
             patch(my, { reportId: ev.reportId, address: ev.address });
+            try { sessionStorage.setItem('hc-last-run', ev.reportId); } catch { /* a reload then shows the plain not-found state */ }
             settle({ reportId: ev.reportId });
             break;
           case 'step': {
