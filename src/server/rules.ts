@@ -1,0 +1,693 @@
+import type {
+  CaseRow, ClaimRow, CostRow, Decision, EmailDraft, FindingLabel, GlanceTile, HazardCheck, HistoryRow, InfoRow, ListingClaims,
+  MoneyInputs, Report, SectionKey, SectionState, SystemRow, Tone, Unknown,
+} from '../contract/types';
+import { LABELS } from '../contract/labels';
+import { computeCosts } from '../contract/money';
+import type { ResolvedAddress } from './address';
+import { parcelDisplay } from './address';
+import { Cites, S, shortWhat, titleCase } from './cite';
+import type { Hazards, Raw, RollRow, Row } from './sources';
+
+/**
+ * A6/A7/A8: deterministic rules. Code decides every label and number; prose here is the rule's own sentence,
+ * which the writer (writer.ts) may replace with a checked model sentence.
+ */
+
+export type StepKey = 'parcel' | 'roll' | 'permits' | 'trade_permits' | 'complaints' | 'planning' | 'zoning' | 'tenants' | 'hazards' | 'nearby' | 'money';
+
+export interface RuleInput {
+  listingText: string;
+  claims: ListingClaims;
+  agentEmail: string | null;
+  addr: ResolvedAddress;
+  raw: Partial<Raw>;
+  failed: Set<StepKey>;
+  now: Date;
+  reportId: string;
+  closing?: Date;
+}
+
+/* ---------- small helpers ---------- */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export function fmtDate(iso?: string | null): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!m) return String(y);
+  if (!d) return `${MONTHS[m - 1]} ${y}`;
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
+const year = (iso?: string | null) => (iso ? Number(iso.slice(0, 4)) : null);
+const day = (iso?: string | null) => (iso ? iso.slice(0, 10) : '');
+const n = (s?: string | null) => (s == null || s === '' ? null : Number(s));
+const int = (x: number) => new Intl.NumberFormat('en-US').format(Math.round(x));
+const money = (x: number) => '$' + int(x);
+const WORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const word = (x: number) => WORD[x] ?? String(x);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const lower = (s?: string) => (s ?? '').toLowerCase();
+const isComplete = (p: Row) => /complete|finaled/i.test(p.status ?? '') || (!!p.completed_date && !/cancel|withdraw|expired/i.test(p.status ?? ''));
+const isLive = (p: Row) => /issued|filed|approved|reinstated|plancheck|triage/i.test(p.status ?? '') && !p.completed_date;
+const ILLEGAL_UNIT = /illegal unit|illegal in-?law|udu|unauthori[sz]ed (dwelling )?unit|unwarranted unit|in-?law unit|illegal dwelling|garage unit/;
+const BATH_COUNT = /(\d+|one|two|three|four|five)\s+(?:new\s+|full\s+|half\s+)?(?:bath(?:room)?s?)\b/i;
+const WORDNUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+
+function bathsIn(desc: string): { count: number; added: boolean } | null {
+  const d = lower(desc);
+  if (/in[- ]kind/.test(d)) return null;
+  const m = d.match(BATH_COUNT);
+  const added = /\b(add|adding|added|new)\b[^.]*bath/.test(d);
+  if (m) { const c = /^\d/.test(m[1]) ? Number(m[1]) : WORDNUM[m[1]] ?? 0; return { count: c, added: /\badd(ing|ed)?\b/.test(d) && !/remodel/.test(d) }; }
+  if (added && /\bbath(room)?\b/.test(d)) return { count: 1, added: true };
+  return null;
+}
+
+/* ---------- the rules ---------- */
+
+export function buildReport(input: RuleInput): Report {
+  const { claims, addr, raw, failed } = input;
+  const cites = new Cites();
+  const c = cites.c.bind(cites);
+  const P = addr.parcels[0];
+  const pid = P?.parcel ?? 'unknown';
+  const rollRows = (raw.roll ?? []) as RollRow[];
+  const latestYear = rollRows.reduce((m, r) => Math.max(m, Number(r.closed_roll_year ?? 0)), 0);
+  const roll = rollRows.find((r) => Number(r.closed_roll_year) === latestYear) ?? null;
+  const rollSrc = roll ? S.roll(roll.parcel_number ?? pid, String(latestYear)) : null;
+  const lien = latestYear ? `${latestYear}-01-01` : null;
+  const yearBuilt = n(roll?.year_property_built) || null;
+  const lotSqft = n(roll?.lot_area) || null;
+  const rollUnits = n(roll?.number_of_units);
+  const rollBaths = n(roll?.number_of_bathrooms);
+  const rollBeds = n(roll?.number_of_bedrooms);
+  const rollArea = n(roll?.property_area) || null;
+
+  const permits = [...(raw.permits ?? [])].sort((a, b) => (b.filed_date ?? '').localeCompare(a.filed_date ?? ''));
+  const cfcs = raw.cfc ?? [];
+  const plumbing = raw.plumbing ?? [];
+  const electrical = raw.electrical ?? [];
+  const complaints = raw.complaints ?? [];
+  const novs = raw.novs ?? [];
+  const planning = raw.planning ?? [];
+  const projects = raw.planningProjects ?? [];
+  const zoningRow = raw.zoning?.[0];
+  const zoning = zoningRow?.zoning_sim ?? zoningRow?.zoning ?? (roll?.zoning_code ? roll.zoning_code.replace(/^([A-Z]+)(\d)/, '$1-$2') : null);
+  const historic = (raw.historic ?? []).find((h) => /listed/i.test(h.a10 ?? '') || /listed/i.test(h.a11 ?? '')) ?? null;
+
+  /* ----- complaint history about an illegal unit ----- */
+  const complaintText = (cn: Row) => lower(`${cn.complaint_description ?? ''} ${novs.filter((v) => v.complaint_number === cn.complaint_number).map((v) => `${v.code_violation_desc ?? ''} ${v.item ?? ''}`).join(' ')}`);
+  const unitComplaints = complaints.filter((cn) => ILLEGAL_UNIT.test(complaintText(cn)) || /nov\s*#?\s*\d+/.test(lower(cn.complaint_description)) && ILLEGAL_UNIT.test(lower(cn.complaint_description)))
+    .sort((a, b) => (a.date_filed ?? '').localeCompare(b.date_filed ?? ''));
+  // Amendments to an earlier NOV ("amendment to nov 201488731") belong to the same issue.
+  for (const cn of complaints) {
+    const ref = lower(cn.complaint_description).match(/amendment to nov\s*#?\s*(\d+)/);
+    if (ref && unitComplaints.some((u) => u.complaint_number === ref[1]) && !unitComplaints.includes(cn)) unitComplaints.push(cn);
+  }
+  unitComplaints.sort((a, b) => (a.date_filed ?? '').localeCompare(b.date_filed ?? ''));
+  const firstUnitComplaint = unitComplaints[0] ?? null;
+
+  /* ----- unit timeline: completed unit-changing permits, then certificates, then Housing Production ----- */
+  const unitPermits = permits.filter((p) => n(p.existing_units) != null && n(p.proposed_units) != null && n(p.existing_units) !== n(p.proposed_units));
+  const completedUnit = unitPermits.filter(isComplete).sort((a, b) => (a.completed_date ?? '').localeCompare(b.completed_date ?? ''));
+  const liveUnit = unitPermits.filter(isLive);
+  const lastUnitPermit = completedUnit[completedUnit.length - 1] ?? null;
+  const unitCfc = lastUnitPermit ? cfcs.find((x) => x.building_permit_application === lastUnitPermit.permit_number) ?? null : null;
+  const housingRow = (raw.housing ?? []).find((h) => n(h.net_units_completed)) ?? null;
+  let recordUnits: number | null = lastUnitPermit ? n(lastUnitPermit.proposed_units) : null;
+  if (recordUnits == null) {
+    const latestWithUnits = permits.filter(isComplete).find((p) => n(p.proposed_units) != null);
+    recordUnits = latestWithUnits ? n(latestWithUnits.proposed_units) : rollUnits && rollUnits > 0 ? rollUnits : null;
+  }
+  const unitLegalized = !!lastUnitPermit && /legaliz|adu/.test(lower(lastUnitPermit.description));
+
+  /* ----- ledger ----- */
+  const ledger: ClaimRow[] = [];
+  const listingUnits = claims.units;
+
+  // Units
+  if (listingUnits != null || claims.adu) {
+    const lu = listingUnits ?? 1;
+    const adu = claims.adu;
+    if (lastUnitPermit && recordUnits != null && lu === recordUnits) {
+      const after = !lien || day(lastUnitPermit.completed_date) >= lien || (rollUnits ?? 0) < recordUnits;
+      const label: FindingLabel = (rollUnits ?? 0) === recordUnits ? 'matches' : after ? 'permitted_not_updated' : 'matches';
+      const permitSrc = S.permit(lastUnitPermit);
+      ledger.push({
+        key: 'units', title: 'Units', listing: String(lu), records: String(recordUnits), label,
+        why: label === 'permitted_not_updated'
+          ? `Permit ${lastUnitPermit.permit_number} ${unitLegalized ? 'legalized the ground-floor unit under the ADU program' : `changed the building from ${lastUnitPermit.existing_units?.replace('.0', '')} to ${recordUnits} units`} and closed with a certificate of final completion on ${fmtDate(unitCfc?.date_issued ?? lastUnitPermit.completed_date)} ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}. The assessor's roll is a snapshot from ${fmtDate(lien)}, before that work finished ${c(rollSrc)}.`
+          : `Permit ${lastUnitPermit.permit_number} set the building at ${recordUnits} units ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}, and the assessor agrees ${c(rollSrc)}.`,
+      });
+    } else if (adu === 'claimed' && !unitLegalized) {
+      const base = recordUnits ?? rollUnits ?? 1;
+      ledger.push({
+        key: 'units', title: 'Units', listing: `${lu} plus in-law`, records: String(base), label: 'records_differ',
+        why: `The listing counts an in-law on top of ${lu} unit${lu === 1 ? '' : 's'}. City records show ${base} legal unit${base === 1 ? '' : 's'} ${c(rollSrc)}.`,
+      });
+    } else if (recordUnits != null) {
+      const live = liveUnit[0];
+      const label: FindingLabel = lu === recordUnits ? 'matches' : live && n(live.proposed_units) === lu ? 'permitted_not_finaled' : lu > recordUnits ? 'no_permit_found' : 'records_differ';
+      ledger.push({
+        key: 'units', title: 'Units', listing: String(lu), records: String(recordUnits), label,
+        why: label === 'matches' ? `Records show ${recordUnits} unit${recordUnits === 1 ? '' : 's'} ${c(rollSrc)}.`
+          : label === 'permitted_not_finaled' ? `Permit ${live.permit_number} would make ${lu} units but is not signed off ${c(S.permit(live))}.`
+          : label === 'no_permit_found' ? `No permit adds a unit beyond the ${recordUnits} on record ${c(rollSrc)}.${firstUnitComplaint ? ` A ${year(firstUnitComplaint.date_filed)} complaint described an illegal unit ${c(S.complaint(firstUnitComplaint))}.` : ''}`
+          : `The listing says ${lu}, records show ${recordUnits} ${c(rollSrc)}.`,
+      });
+    }
+  }
+
+  // Baths
+  const finaledBaths = plumbing.filter(isComplete).map((p) => ({ p, b: bathsIn(p.description ?? '') })).filter((x) => x.b && (!lien || day(x.p.completed_date) >= `${(latestYear || 2000) - 3}-01-01`));
+  const liveBaths = plumbing.filter((p) => !isComplete(p) && /issued|filed/i.test(p.status ?? '')).map((p) => ({ p, b: bathsIn(p.description ?? '') })).filter((x) => x.b);
+  if (claims.baths != null) {
+    const mentioned = finaledBaths.filter((x) => !x.b!.added).reduce((s, x) => s + x.b!.count, 0);
+    const added = finaledBaths.filter((x) => x.b!.added).reduce((s, x) => s + x.b!.count, 0);
+    const recBaths = finaledBaths.length ? Math.max((rollBaths ?? 0) + added, mentioned) : rollBaths;
+    const srcs = finaledBaths.map((x) => S.plumbing(x.p, /adu/i.test(x.p.description ?? '') ? 'ADU baths' : /2\/f|2nd|upstairs|second/i.test(x.p.description ?? '') ? 'upstairs baths' : 'baths'));
+    let label: FindingLabel;
+    let why: string;
+    if (recBaths != null && claims.baths === recBaths && finaledBaths.length && rollBaths !== recBaths) {
+      label = 'permitted_not_updated';
+      const when = finaledBaths.map((x) => x.p.completed_date).sort().pop();
+      why = `${cap(word(finaledBaths.length))} plumbing permit${finaledBaths.length > 1 ? 's' : ''} passed final inspection on ${fmtDate(when)}: ${finaledBaths.map((x) => `${word(x.b!.count)} bath${x.b!.count > 1 ? 's' : ''} ${/adu/i.test(x.p.description ?? '') ? 'in the ADU' : /2\/f|2nd|upstairs|second/i.test(x.p.description ?? '') ? 'upstairs' : x.b!.added ? 'added' : 'redone'}`).join(' and ')} ${c(...srcs)}. The assessor still records ${rollBaths ?? 'no'} bath${rollBaths === 1 ? '' : 's'} ${c(rollSrc)}.`;
+    } else if (recBaths != null && claims.baths === recBaths) {
+      label = 'matches';
+      why = `The assessor records ${recBaths} bath${recBaths === 1 ? '' : 's'} ${c(rollSrc)}${srcs.length ? `, and plumbing finals agree ${c(...srcs)}` : ''}.`;
+    } else if (liveBaths.length && claims.baths > (recBaths ?? 0)) {
+      label = 'permitted_not_finaled';
+      const lb = liveBaths[0];
+      why = `Plumbing permit ${lb.p.permit_number} covers ${word(lb.b!.count)} bath${lb.b!.count > 1 ? 's' : ''} and is issued, not final ${c(S.plumbing(lb.p, `${word(lb.b!.count)} bath${lb.b!.count > 1 ? 's' : ''}`))}. The assessor records ${rollBaths ?? 'no'} ${c(rollSrc)}.`;
+    } else if (recBaths != null && claims.baths > recBaths) {
+      label = 'no_permit_found';
+      why = `The assessor records ${recBaths} bath${recBaths === 1 ? '' : 's'} ${c(rollSrc)}, and no plumbing permit adds one.`;
+    } else {
+      label = recBaths == null ? 'not_settled' : 'records_differ';
+      why = recBaths == null ? 'The assessor leaves baths blank and no plumbing permit settles it.' : `The listing says ${claims.baths}, the assessor records ${recBaths} ${c(rollSrc)}.`;
+    }
+    const recText = label === 'permitted_not_finaled' ? `${liveBaths[0].b!.count} permitted` : recBaths != null ? String(recBaths) : null;
+    ledger.push({ key: 'baths', title: 'Baths', listing: String(claims.baths), records: recText, label, why });
+  }
+
+  // Sq ft
+  if (claims.sqft != null) {
+    const proj = projects.filter((p) => n(p.residential_prop)).sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''))[0];
+    const projArea = proj ? n(proj.residential_prop) : null;
+    const projDone = proj ? (proj.building_permits ?? '').split(/,\s*/).some((bp) => permits.some((p) => p.permit_number === bp.trim() && isComplete(p))) : false;
+    const near = (a: number | null, b: number) => a != null && Math.abs(a - b) / b <= 0.1;
+    let row: ClaimRow;
+    const projSrc = proj ? S.planning(proj) : null;
+    if (projArea && projDone && near(projArea, claims.sqft)) {
+      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: int(projArea), label: 'matches_planning',
+        why: `Planning approved the ${/adu/i.test(proj!.description ?? '') ? 'ADU ' : ''}project at ${int(projArea)} sq ft of floor area${n(proj!.residential_exist) ? `, up from ${int(n(proj!.residential_exist)!)}` : ''} ${c(projSrc)}.${rollArea ? ` The assessor's ${int(rollArea)} predates the work ${c(rollSrc)}.` : ''}` };
+    } else if (projArea && rollArea && !near(rollArea, projArea)) {
+      const lo = Math.min(rollArea, projArea), hi = Math.max(rollArea, projArea);
+      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: `${int(lo)} to ${int(hi)}`, label: 'records_disagree',
+        why: `The assessor records ${int(rollArea)} sq ft ${c(rollSrc)}. Planning approved ${int(projArea)} sq ft ${c(projSrc)}${projDone ? '' : ', for work that is not signed off'}. Ask for a measured floor plan.` };
+    } else if (rollArea && near(rollArea, claims.sqft)) {
+      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: int(rollArea), label: 'matches', why: `The assessor records ${int(rollArea)} sq ft ${c(rollSrc)}.` };
+    } else if (rollArea) {
+      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: int(rollArea), label: 'records_differ',
+        why: `The assessor records ${int(rollArea)} sq ft ${c(rollSrc)}. Appraisals can come in below the advertised size, so ask how it was measured.` };
+    } else {
+      row = { key: 'sqft', title: 'Sq ft', listing: int(claims.sqft), records: null, label: 'not_settled', why: 'No city record gives the floor area.' };
+    }
+    ledger.push(row);
+  }
+
+  // The permit that best describes current work: the costliest live permit, else the latest one.
+  const mainPermit = [...permits.filter(isLive)].sort((a, b) => Number(b.revised_cost ?? b.estimated_cost ?? 0) - Number(a.revised_cost ?? a.estimated_cost ?? 0))[0] ?? permits[0] ?? null;
+
+  // In-law
+  if (claims.adu) {
+    if (unitLegalized && lastUnitPermit) {
+      const label: FindingLabel = unitComplaints.length ? 'resolved' : 'matches';
+      const yrs = [...new Set(unitComplaints.map((x) => year(x.date_filed)))].filter(Boolean) as number[];
+      const yrsText = yrs.length > 2 ? `${yrs.slice(0, -1).join(', ')} and ${yrs[yrs.length - 1]}` : yrs.join(' and ');
+      const firstDesc = firstUnitComplaint ? complaintText(firstUnitComplaint) + ' ' + unitComplaints.map(complaintText).join(' ') : '';
+      const detail = /ventilation|window|egress/.test(firstDesc) ? ' with no windows or ventilation in the bedroom' : '';
+      const novCount = (lastUnitPermit.description ?? '').match(/nov\s*#?\s*\d+/gi)?.length ?? 0;
+      ledger.push({
+        key: 'adu', title: 'In-law', listing: claims.adu === 'legal' ? 'Legal' : 'In-law', records: `Legal ${year(lastUnitPermit.completed_date)}`, label,
+        why: label === 'resolved'
+          ? `Complaints in ${yrsText} cited an illegal unit${detail} ${c(S.complaint(firstUnitComplaint!))}. The ${year(lastUnitPermit.filed_date)} permit was filed to comply with ${novCount === 2 ? 'both notices' : novCount > 2 ? 'the notices' : 'the notice'} of violation and is complete ${c(S.permit(lastUnitPermit))}.`
+          : `Permit ${lastUnitPermit.permit_number} created the unit and is complete ${c(S.permit(lastUnitPermit))}.`,
+      });
+    } else {
+      const live = liveUnit[0];
+      ledger.push({
+        key: 'adu', title: 'In-law', listing: claims.adu === 'legal' ? 'Legal' : /garden/i.test(input.listingText) ? 'Garden in-law' : 'In-law',
+        records: live ? 'Not finaled' : 'None', label: live ? 'permitted_not_finaled' : 'no_permit_found',
+        why: live ? `Permit ${live.permit_number} would add the unit and is not signed off ${c(S.permit(live))}.`
+          : `No permit creates a second unit${mainPermit ? ` ${c(S.permit(mainPermit))}` : ''}.${firstUnitComplaint ? ` A ${year(firstUnitComplaint.date_filed)} complaint described an unpermitted unit ${c(S.complaint(firstUnitComplaint))}.` : ''} Ask whether anyone lives there.`,
+      });
+    }
+  }
+
+  // Bedrooms
+  if (claims.beds != null) {
+    const bedPermit = permits.find((p) => /bedroom/.test(lower(p.description)) && isComplete(p));
+    if (!rollBeds && !bedPermit) {
+      // Nothing in the records speaks to bedrooms; a row would only say so.
+    } else if (!rollBeds) {
+      ledger.push({ key: 'beds', title: 'Bedrooms', listing: String(claims.beds), records: null, label: 'not_settled',
+        why: `The assessor leaves bedrooms blank for this parcel.${bedPermit ? ` A ${year(bedPermit.completed_date)} permit ${/office/.test(lower(bedPermit.description)) ? 'converted one upstairs bedroom to an office' : 'changed a bedroom'} ${c(S.permit(bedPermit))}.` : ''} Ask for the floor plan.` });
+    } else {
+      ledger.push({ key: 'beds', title: 'Bedrooms', listing: String(claims.beds), records: String(rollBeds), label: rollBeds === claims.beds ? 'matches' : 'records_differ',
+        why: `The assessor records ${rollBeds} bedroom${rollBeds === 1 ? '' : 's'} ${c(rollSrc)}.` });
+    }
+  }
+
+  /* ----- cases ----- */
+  const cases: CaseRow[] = [];
+  const active = complaints.filter((x) => /^active/i.test(x.status ?? '')).sort((a, b) => (b.date_filed ?? '').localeCompare(a.date_filed ?? ''));
+  const activeNovs = novs.filter((v) => /^active/i.test(v.status ?? '') && !active.some((a) => a.complaint_number === v.complaint_number));
+  const caseFee = active.length || activeNovs.length ? 152 : null;
+  for (const a of active) {
+    const nov = novs.find((v) => v.complaint_number === a.complaint_number);
+    const d = lower(a.complaint_description);
+    const title = /over[- ]?excavat/.test(d) ? 'Over-excavation at the rear' : /shoring|excavat/.test(d) ? 'Excavation before a shoring permit'
+      : /without (a )?permit|no permit/.test(d) || nov?.work_without_permit === 'Y' ? 'Work without a permit' : cap(shortWhat(a.complaint_description, 'Open complaint'));
+    const flags = [nov?.work_without_permit === 'Y' ? 'work without a permit' : '', nov?.additional_work_beyond_permit === 'Y' ? 'work beyond the permit' : ''].filter(Boolean);
+    cases.push({
+      glyph: 'violation', title, label: 'open_case',
+      text: `Complaint ${a.complaint_number}, filed ${fmtDate(a.date_filed)}, is active${flags.length ? `, flagged ${flags.join(' and ')}` : ''} ${c(S.complaint(a))}.`,
+      stake: `${money(152)} a month in monitoring fees while open ${c(S.dbiFees())}`,
+    });
+  }
+  const openPlanning = planning.filter((p) => /ENF/.test(p.record_type ?? p.record_id ?? '') && !/^closed/i.test(p.record_status ?? ''));
+  for (const p of openPlanning) {
+    const aboutUnit = ILLEGAL_UNIT.test(lower(p.description));
+    const newerCfc = aboutUnit && unitCfc && day(unitCfc.date_issued) > day(p.open_date);
+    cases.push({
+      glyph: 'planning', title: `Planning enforcement case still "${lower(p.record_status)}"`, label: newerCfc ? 'likely_stale' : 'open_case',
+      text: newerCfc
+        ? `Case ${p.record_id}, opened ${fmtDate(p.open_date)}, notes an unauthorized unit. The unit was certified in ${year(unitCfc!.date_issued)}, so this is probably outdated ${c(S.planning(p), S.cfc(unitCfc!))}.`
+        : `Case ${p.record_id}, opened ${fmtDate(p.open_date)}, is still open ${c(S.planning(p))}.`,
+    });
+  }
+
+  // Renovation claim vs open work (only when it does not simply check out)
+  if (claims.renovations.length) {
+    const bigLive = permits.filter(isLive).filter((p) => /remodel|renovat|slab|garage|excavat|addition/.test(lower(p.description)));
+    if (bigLive.length) {
+      const p = bigLive.sort((a, b) => Number(b.estimated_cost ?? 0) - Number(a.estimated_cost ?? 0))[0];
+      const label: FindingLabel = active.length ? 'open_case' : 'permitted_not_finaled';
+      ledger.unshift({
+        key: 'renovation', title: 'Renovated', listing: input.listingText.match(/renovated\s+(20\d\d)/i)?.[1] ?? 'Yes', records: 'Not finaled', label,
+        why: `The remodel permit ${p.permit_number}${Number(p.estimated_cost) ? `, valued at ${money(Number(p.revised_cost ?? p.estimated_cost))},` : ''} is issued, not complete ${c(S.permit(p))}.${active.length ? ` ${cap(word(active.length))} complaint${active.length > 1 ? 's are' : ' is'} active ${c(...active.map(S.complaint))}.` : ''}`,
+      });
+    }
+  }
+  // Sort ledger by severity so problems come first.
+  const sev: Record<FindingLabel, number> = { open_case: 0, no_permit_found: 1, records_differ: 2, permitted_not_finaled: 3, records_disagree: 4, likely_stale: 5, not_settled: 6, permitted_not_updated: 7, resolved: 8, matches_planning: 9, matches: 10 };
+  if (ledger.some((r) => sev[r.label] <= 3)) ledger.sort((a, b) => sev[a.label] - sev[b.label]);
+
+  /* ----- systems ----- */
+  const systems: SystemRow[] = [];
+  const builtText = yearBuilt ? `Built ${yearBuilt}, so ask the inspector to look at it.` : 'Ask the inspector to look at it.';
+  const sysStatus = (p: Row): SystemRow['status'] => (isComplete(p) ? ((year(p.completed_date) ?? 0) < input.now.getUTCFullYear() - 30 ? 'old' : 'updated') : 'in_progress');
+  {
+    const bathSrcs = finaledBaths.map((x) => x.p);
+    const plumb = bathSrcs.length ? bathSrcs : plumbing.filter((p) => /^PP/i.test(p.permit_number ?? '')).sort((a, b) => (b.completed_date ?? b.issued_date ?? '').localeCompare(a.completed_date ?? a.issued_date ?? '')).slice(0, 1);
+    if (plumb.length) {
+      const p0 = plumb[0];
+      const st = plumb.every(isComplete) ? sysStatus(p0) : 'in_progress';
+      const d = lower(plumb.map((p) => p.description).join(' '));
+      const what = /galvani|main stack|repipe/.test(d) ? 'Galvanized pipes and main stack being replaced' : plumb.length > 1 && /adu/.test(d) ? 'Both units replumbed for new baths and kitchens' : /bath/.test(d) ? 'Plumbing for new baths' : 'Plumbing work';
+      systems.push({ glyph: 'plumbing', title: 'Plumbing', year: year(p0.completed_date ?? p0.issued_date ?? p0.filed_date), status: st,
+        text: st === 'in_progress' ? `${what}, permit issued, not final ${c(...plumb.map((p) => S.plumbing(p)))}` : `${what}, final ${fmtDate(plumb.map((p) => p.completed_date).sort().pop())} ${c(...plumb.map((p) => S.plumbing(p, /adu/i.test(p.description ?? '') ? 'ADU baths' : /2\/f|2nd|upstairs/i.test(p.description ?? '') ? 'upstairs baths' : undefined)))}` });
+    } else systems.push({ glyph: 'plumbing', title: 'Plumbing', year: null, status: 'no_record', text: `No plumbing permit on record. ${builtText}` });
+  }
+  {
+    const roofs = permits.filter((p) => /re-?roof|roofing/.test(lower(p.description)) && (isComplete(p) || isLive(p)));
+    const r = roofs.filter(isComplete).sort((a, b) => (b.completed_date ?? '').localeCompare(a.completed_date ?? ''))[0] ?? roofs[0];
+    if (r) {
+      const st = sysStatus(r);
+      systems.push({ glyph: 'roof', title: 'Roof', year: year(r.completed_date ?? r.issued_date), status: st,
+        text: st === 'in_progress' ? `Reroof permit issued, not complete ${c(S.permit(r))}` : `Reroofed, permit complete ${fmtDate(r.completed_date)} ${c(S.permit(r))}` });
+    } else systems.push({ glyph: 'roof', title: 'Roof', year: null, status: 'no_record', text: `No roof permit on record. ${builtText}` });
+  }
+  {
+    const el = [...electrical].sort((a, b) => (b.completed_date ?? b.issued_date ?? '').localeCompare(a.completed_date ?? a.issued_date ?? ''));
+    if (el.length && P) {
+      const e0 = el[0];
+      const st = isComplete(e0) ? sysStatus(e0) : 'in_progress';
+      const yr = year(e0.completed_date ?? e0.issued_date ?? e0.filed_date);
+      const d = lower(el.slice(0, 3).map((e) => e.description).join(' '));
+      const what = /knob/.test(d) ? 'Knob-and-tube wiring being replaced' : /service|panel|200 ?a/.test(d) ? 'Panel or service upgraded' : `Electrical permits filed with the ${year(e0.filed_date ?? e0.issued_date) ?? ''} remodel`.replace(' the  remodel', ' the remodel');
+      systems.push({ glyph: 'electrical', title: 'Wiring', year: yr, status: st,
+        text: st === 'in_progress' ? `${what}, permit issued, not final ${c(S.electrical(P, yr ? String(yr) : null))}` : `${what}, complete ${c(S.electrical(P, yr ? String(yr) : null))}` });
+    } else systems.push({ glyph: 'electrical', title: 'Wiring', year: null, status: 'no_record', text: `No electrical permit on record. ${builtText}` });
+  }
+  {
+    const f = permits.find((p) => /foundation|seismic|retrofit|grade beam|underpin/.test(lower(p.description)) && (isComplete(p) || isLive(p)));
+    if (f) {
+      const st = sysStatus(f);
+      systems.push({ glyph: 'foundation', title: 'Foundation', year: year(f.completed_date ?? f.issued_date), status: st,
+        text: st === 'in_progress' ? `Foundation work permitted, not complete${active.length ? ', under the open complaints' : ''} ${c(S.permit(f), ...(active.length ? active.map(S.complaint) : []))}` : `Foundation work complete ${fmtDate(f.completed_date)} ${c(S.permit(f))}` });
+    } else systems.push({ glyph: 'foundation', title: 'Foundation', year: null, status: 'no_record', text: `No permit on record. ${builtText}` });
+  }
+  {
+    const s = [...permits, ...plumbing].find((p) => /sewer lateral|side sewer|lateral/.test(lower(p.description)) && (isComplete(p) || isLive(p)));
+    if (s) {
+      const isPlumb = /^P/i.test(s.permit_number ?? '');
+      systems.push({ glyph: 'plumbing', title: 'Sewer lateral', year: year(s.completed_date ?? s.issued_date), status: sysStatus(s), text: `Sewer lateral work on record ${c(isPlumb ? S.plumbing(s) : S.permit(s))}` });
+    } else systems.push({ glyph: 'plumbing', title: 'Sewer lateral', year: null, status: 'no_record', text: `No permit on record. A camera inspection costs a few hundred dollars and is worth it${yearBuilt ? ` for a ${yearBuilt} house` : ''}.` });
+  }
+
+  /* ----- tenants ----- */
+  const tenants: InfoRow[] = [];
+  const buyouts = raw.buyouts ?? [];
+  const hotel = raw.hotelTax ?? [];
+  const addrUpper = `${Number(addr.input.number)} ${addr.streetName}%`;
+  const slug = `${Number(addr.input.number)}-${addr.streetName.toLowerCase().replace(/\s+/g, '-')}`;
+  for (const b of buyouts.slice(0, 3)) {
+    const amt = n(b.buyout_amount);
+    const t = n(b.number_of_tenants);
+    tenants.push({ glyph: 'tenants', title: `Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}`,
+      text: `Buyout ${b.case_number}, filed ${fmtDate(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}: ${amt ? money(amt) + ' paid' : 'paid'} to ${t ?? 'the'} tenant${t === 1 ? '' : 's'} to leave ${c(S.buyout(b, addr.display, addrUpper))}. A past buyout can limit converting the units to condos later. Ask the Rent Board how it applies.` });
+  }
+  const hotelStart = hotel.map((h) => h.location_start_date).filter(Boolean).sort()[0] ?? null;
+  const hotelSrc = hotel.length ? S.hotelTax(slug, addr.display, day(hotelStart) || null) : null;
+  if (hotel.length) {
+    tenants.push({ glyph: 'money', title: 'Short-term rental signal',
+      text: `A business at this address has been registered for hotel tax since ${fmtDate(hotelStart)} ${c(hotelSrc)}. That usually means short-term rentals. Ask whether any bookings run past closing.` });
+  }
+  const unitsNow = recordUnits ?? rollUnits ?? 1;
+  const preRentControl = yearBuilt != null && yearBuilt < 1979;
+  if (unitsNow >= 2 && preRentControl) {
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `${cap(word(unitsNow))} units in a building from ${yearBuilt}. Units like these are usually covered by eviction protections, and often by rent limits. Confirm with the Rent Board before you plan to move in or rent out.` });
+  } else if (unitsNow >= 2) {
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `${cap(word(unitsNow))} units${yearBuilt ? ` in a building from ${yearBuilt}` : ''}. Eviction protections can still apply. Confirm with the Rent Board.` });
+  } else {
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: 'One legal unit. A rented in-law unit, permitted or not, can bring eviction protections with it. Confirm with the Rent Board.' });
+  }
+  if (firstUnitComplaint && unitsNow >= 2) {
+    tenants.push({ glyph: 'complaint', title: 'Tenants now', text: `Not in public records. The ${year(firstUnitComplaint.date_filed)} complaint described a renter in the ${/garage/.test(complaintText(firstUnitComplaint)) ? 'garage ' : ''}unit ${c(S.complaint(firstUnitComplaint))}. Ask whether either unit is occupied.` });
+  } else if (!buyouts.length && !hotel.length) {
+    tenants.push({ glyph: 'resolved', title: 'No buyouts or hotel-tax registrations', text: `No tenant buyout on file for this address ${c(S.noBuyout(pid))}.`, muted: true });
+  }
+
+  /* ----- upside ----- */
+  const upside: InfoRow[] = [];
+  if (zoning) {
+    const z = zoning.toUpperCase();
+    const desc = /^RH-1/.test(z) ? `Residential, one-family district.${unitLegalized ? ' The legalized ADU is the second unit.' : ' An ADU can usually be added with a permit.'}`
+      : /^RH-2/.test(z) ? 'Residential, two-family district. A second unit is allowed in principle, with its own permit.'
+      : /^RH-3/.test(z) ? 'Residential, three-family district.' : /^RM/.test(z) ? 'Residential, mixed apartments.' : /^NC/.test(z) ? 'Neighborhood commercial district.' : 'See the Planning Code for what this district allows.';
+    upside.push({ glyph: 'zoning', title: `Zoning ${zoning}`, text: desc });
+  }
+  const sb9 = !!zoning && /^RH-1/.test(zoning) && lotSqft != null && lotSqft >= 2400 && !historic;
+  if (lotSqft) {
+    upside.push({ glyph: 'grow', title: `Lot ${int(lotSqft)} sq ft`,
+      text: sb9 ? `Above the 2,400 sq ft minimum for an SB 9 lot split. SB 9 is off the table if a unit was rented in the last 3 years ${c(rollSrc)}.`
+        : lotSqft >= 2400 ? `Large enough for an SB 9 split only in a one-family district ${c(rollSrc)}.` : `Below the 2,400 sq ft minimum for an SB 9 lot split ${c(rollSrc)}.` });
+  }
+  if (historic) {
+    upside.push({ glyph: 'planning', title: 'Historic district', text: `In the ${historic.name_1?.replace(/ Historic District$/i, '')} landmark district, so exterior changes go through historic review ${c(S.historic(pid, historic.name_1 ?? 'district'))}.` });
+  }
+
+  /* ----- hazards ----- */
+  const hz = raw.hazards as Hazards | undefined;
+  const hazards: HazardCheck[] = [];
+  if (hz) {
+    const hs = S.hazards(pid);
+    const flood = hz.femaZone;
+    const floodNote = !!flood && /^(A|V)/.test(flood);
+    hazards.push(flood == null ? { key: 'flood', title: 'Flood', status: 'unknown', text: 'FEMA flood map did not answer' }
+      : { key: 'flood', title: 'Flood', status: floodNote ? 'note' : 'clear', text: floodNote ? `FEMA zone ${flood}, a high-risk flood area ${c(hs)}. Lenders require flood insurance.` : `FEMA zone ${flood}, minimal flood hazard ${c(hs)}` });
+    hazards.push(hz.stormFlood == null ? { key: 'storm_flood', title: 'Storm flooding', status: 'unknown', text: 'The storm flood map did not answer' }
+      : { key: 'storm_flood', title: 'Storm flooding', status: hz.stormFlood ? 'note' : 'clear', text: hz.stormFlood ? `Inside the city's 100-year storm flood zone ${c(S.stormflood(pid))}. Sellers must disclose it.` : `Outside the city's 100-year storm flood zone ${c(S.stormflood(pid))}` });
+    hazards.push(hz.liquefaction == null ? { key: 'liquefaction', title: 'Liquefaction', status: 'unknown', text: 'The state liquefaction map did not answer' }
+      : { key: 'liquefaction', title: 'Liquefaction', status: hz.liquefaction ? 'note' : 'clear', text: hz.liquefaction ? `Inside a state liquefaction zone ${c(hs)}. Ask about the foundation.` : `Outside the state liquefaction zone ${c(hs)}` });
+    if (hz.landslideZone) hazards.push({ key: 'landslide', title: 'Landslide', status: 'note', text: `Inside a state landslide zone ${c(hs)}${hz.landslideClass ? `, susceptibility class ${hz.landslideClass} of 10 ${c(S.landslide(pid))}` : ''}. Worth raising with the inspector.` });
+    else if ((hz.landslideClass ?? 0) >= 7) hazards.push({ key: 'landslide', title: 'Landslide', status: 'note', text: `Susceptibility class ${hz.landslideClass} on the city's landslide map, where 10 is highest ${c(S.landslide(pid))}. Worth raising with a structural engineer.` });
+    else hazards.push({ key: 'landslide', title: 'Landslide', status: hz.landslideZone == null ? 'unknown' : 'clear', text: hz.landslideZone == null ? 'The state landslide map did not answer' : `Outside the state landslide zone ${c(hs)}` });
+    hazards.push(hz.tsunami == null ? { key: 'tsunami', title: 'Tsunami', status: 'unknown', text: 'The tsunami map did not answer' }
+      : { key: 'tsunami', title: 'Tsunami', status: hz.tsunami ? 'note' : 'clear', text: hz.tsunami ? `Inside the tsunami hazard area ${c(hs)}` : `Outside the tsunami hazard area ${c(hs)}` });
+    hazards.push(hz.seaLevel == null ? { key: 'sea_level', title: 'Sea level rise', status: 'unknown', text: 'The sea level rise map did not answer' }
+      : { key: 'sea_level', title: 'Sea level rise', status: hz.seaLevel ? 'note' : 'clear', text: hz.seaLevel ? `Inside the sea level rise maps ${c(S.sealevel(pid))}` : `Outside the sea level rise maps, even with 66 inches of rise ${c(S.sealevel(pid))}` });
+    const res = hz.reservoirs;
+    hazards.push(res == null ? { key: 'reservoir', title: 'Reservoir', status: 'unknown', text: 'The reservoir map did not answer' }
+      : res.length ? { key: 'reservoir', title: 'Reservoir', status: 'note', text: `Inside the ${res.join(' and ')} reservoir${res.length > 1 ? 's' : ''}' failure zone${res.length > 1 ? 's' : ''} ${c(S.reservoir(pid))}. Ask your insurer whether it changes the quote.` }
+      : { key: 'reservoir', title: 'Reservoir', status: 'clear', text: `Outside every reservoir failure zone ${c(S.reservoir(pid))}` });
+    hazards.push(hz.maher == null ? { key: 'soil', title: 'Soil', status: 'unknown', text: 'The Maher soil map did not answer' }
+      : { key: 'soil', title: 'Soil', status: hz.maher ? 'note' : 'clear', text: hz.maher ? `Inside the Maher soil testing area ${c(S.maher(pid))}. Digging needs soil testing.` : `Outside the Maher soil testing area ${c(S.maher(pid))}` });
+  }
+
+  /* ----- nearby ----- */
+  const nearby: InfoRow[] = [];
+  for (const p of (raw.nearbyProjects ?? [])
+    .filter((p) => p.demolition === 'CHECKED' || p.new_construction === 'CHECKED' || Math.abs(n(p.number_of_units_net) ?? 0) >= 1)
+    .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? '')).slice(0, 4)) {
+    const units = n(p.number_of_units_prop);
+    const d = lower(p.description);
+    const stories = d.match(/(\w+)-story/)?.[1];
+    const storiesN = stories ? (WORDNUM[stories] ?? (stories === 'three' ? 3 : Number(stories))) : null;
+    const what = p.demolition === 'CHECKED' && p.new_construction === 'CHECKED'
+      ? `Full demolition and a new ${storiesN ? storiesN + '-story, ' : ''}${units ? units + '-unit ' : ''}building`
+      : p.new_construction === 'CHECKED' ? `A new ${units ? units + '-unit ' : ''}building` : p.adu === 'CHECKED' ? 'A new in-law unit' : `A change of ${n(p.number_of_units_net)} unit${Math.abs(n(p.number_of_units_net) ?? 0) === 1 ? '' : 's'}`;
+    nearby.push({ glyph: 'nearby', title: titleCase((p.project_address ?? p.project_name ?? '').replace(/\s+\d{5}$/, '')),
+      text: `${what}. Project ${p.record_id} was ${lower(p.record_status).startsWith('submit') ? 'submitted' : lower(p.record_status)} ${fmtDate(p.open_date)}, within 150 m ${c(S.planning(p))}.` });
+  }
+
+  const street = (raw.streetPermits ?? []).filter((p) => /street space/i.test(p.permit_type ?? 'street space'));
+  if (street.length) {
+    const end = street.map((p) => p.permit_end_date).filter(Boolean).sort().pop();
+    nearby.push({ glyph: 'nearby', title: 'Street-space permit',
+      text: `${street.length === 1 ? 'A street-space permit' : `${cap(word(street.length))} street-space permits`} on this frontage ${street.length === 1 ? 'runs' : 'run'} to ${fmtDate(end)}, for construction staging ${c(S.street(pid, addr.display))}.` });
+  }
+
+  /* ----- money (A7) ----- */
+  const assessed = roll ? Math.round((n(roll.assessed_land_value) ?? 0) + (n(roll.assessed_improvement_value) ?? 0) + (n(roll.assessed_fixtures_value) ?? 0)) || null : null;
+  const price = claims.price ?? assessed ?? 0;
+  const inputs: MoneyInputs = {
+    assessedValue: assessed, ownerOccupied: true, melloRoosPerSqft: null, sqft: null, openCaseMonthlyFee: caseFee,
+    sourceIndex: { taxRate: cites.n(S.taxRate()), supplemental: cites.n(S.supplemental()), transferTax: cites.n(S.transfer()), ...(caseFee ? { caseFees: cites.n(S.dbiFees()) } : {}) },
+  };
+  const rows: CostRow[] = computeCosts(price, inputs, input.closing);
+
+  /* ----- unknowns and decision (A8) ----- */
+  const unknowns: Unknown[] = [];
+  const staleCase = cases.find((x) => x.label === 'likely_stale');
+  const openPlan = openPlanning[0];
+  const structural = active.filter((a) => /excavat|shoring|foundation|structural|retaining|collapse|crack/.test(lower(a.complaint_description)));
+  if (structural.length) unknowns.push({ id: 'u-excavation', title: /excavat|shoring/.test(lower(structural[0].complaint_description)) ? 'Is the excavation sound?' : 'Is the structure sound?',
+    why: `${cap(word(structural.length))} active complaint${structural.length > 1 ? 's' : ''} about ${/excavat|shoring/.test(lower(structural[0].complaint_description)) ? 'digging along the property line' : 'the structure'} ${c(...structural.map(S.complaint))}. Only a site visit answers this.`,
+    resolver: 'specialist', action: 'book_specialist', specialist: 'structural engineer' });
+  if (active.length) unknowns.push({ id: 'u-close-cases', title: 'Will the complaints and permits close before you do?', why: `An open case passes to the next owner, and so do its fees ${c(S.dbiFees())}.`, resolver: 'listing_agent', action: 'email_listing_agent' });
+  if (openPlan) unknowns.push({ id: 'u-planning-case', title: 'Is the Planning case closed?', why: `Case ${openPlan.record_id} still reads "${lower(openPlan.record_status)}". A clean close-out protects resale ${c(S.planning(openPlan))}.`, resolver: 'city', action: 'email_city' });
+  const aduRow = ledger.find((r) => r.key === 'adu');
+  if (aduRow && aduRow.label === 'no_permit_found') unknowns.push({ id: 'u-garden-unit', title: 'What is the in-law, legally?', why: aduRow.why.split('. ').slice(0, 1).join('') + '.', resolver: 'listing_agent', action: 'email_listing_agent' });
+  if (unitsNow >= 2) unknowns.push({ id: 'u-tenants', title: 'Is either unit rented?', why: 'A tenant changes when you can move in and what you can charge.', resolver: 'listing_agent', action: 'email_listing_agent' });
+  if (hotel.length) unknowns.push({ id: 'u-short-term', title: 'Are short-term rentals booked?', why: `A hotel-tax registration has been active since ${year(hotelStart)} ${c(hotelSrc)}. Bookings past closing become your problem.`, resolver: 'listing_agent', action: 'email_listing_agent' });
+  const bedsRow = ledger.find((r) => r.key === 'beds');
+  if (bedsRow?.label === 'not_settled') {
+    const bp = permits.find((p) => /bedroom/.test(lower(p.description)) && isComplete(p));
+    unknowns.push({ id: 'u-bedrooms', title: 'How many bedrooms are there now?', why: `Records leave bedrooms blank${bp ? ` and one was turned into an office ${c(S.permit(bp))}` : ''}.`, resolver: 'listing_agent', action: 'email_listing_agent' });
+  }
+
+  const bad = ledger.filter((r) => ['open_case', 'no_permit_found'].includes(r.label)).length + cases.filter((x) => x.label === 'open_case').length;
+  const unsafe = novs.some((v) => v.unsafe_building === 'Y' && /^active/i.test(v.status ?? ''));
+  const tone: Decision['tone'] = unsafe ? 'stop' : bad ? 'caution' : 'clear';
+  const noFoundation = systems.find((s) => s.title === 'Foundation')?.status === 'no_record';
+  const noLateral = systems.find((s) => s.title === 'Sewer lateral')?.status === 'no_record';
+  const extra = noFoundation && noLateral ? ' Ask the inspector to look at the foundation and sewer lateral too.' : noFoundation ? ' Ask the inspector to look at the foundation too.' : noLateral ? ' Ask for a sewer lateral camera inspection too.' : '';
+  const decision: Decision = {
+    tone,
+    title: tone === 'clear' ? 'Looks solid' : tone === 'caution' ? 'Get it checked before you offer' : 'Stop and ask first',
+    inspection: structural.length
+      ? 'Have a structural engineer look at the excavation and foundation before you offer, then a standard inspection.'
+      : tone === 'clear' ? `A standard inspection${unitsNow >= 2 ? ' covering both units' : ''} is enough.${extra}`
+      : `Get a standard inspection before you offer, and ask about the open items below.${extra}`,
+  };
+
+  /* ----- glance ----- */
+  const unitsRow = ledger.find((r) => r.key === 'units');
+  const unitTone: Tone = aduRow?.label === 'no_permit_found' ? 'error' : unitsRow ? LABELS[unitsRow.label].tone : 'neutral';
+  const openCount = cases.length;
+  const notes = hazards.filter((h) => h.status === 'note');
+  const firstNote = notes[0];
+  const hazardStatus = !firstNote ? (hazards.length ? 'All clear' : 'Not checked')
+    : firstNote.key === 'reservoir' ? 'Reservoir zone' : firstNote.key === 'landslide' ? (hz?.landslideClass ? `Landslide class ${hz.landslideClass}` : 'Landslide zone')
+    : firstNote.key === 'flood' ? 'Flood zone' : firstNote.key === 'storm_flood' ? 'Storm flood zone' : firstNote.key === 'liquefaction' ? 'Liquefaction zone' : firstNote.key === 'tsunami' ? 'Tsunami zone' : firstNote.key === 'sea_level' ? 'Sea level rise' : 'Soil testing area';
+  const glance: GlanceTile[] = [
+    { section: 'ledger', glyph: 'parcel', label: 'Legal units', value: String(unitsNow), tone: unitTone,
+      status: aduRow?.label === 'no_permit_found' ? 'In-law not permitted' : !unitsRow ? 'Listing is silent' : ['matches', 'permitted_not_updated', 'resolved', 'matches_planning'].includes(unitsRow.label) ? 'Matches listing' : LABELS[unitsRow.label].text },
+    { section: 'cases', glyph: active.length ? 'violation' : 'planning', label: 'Open city cases', value: String(openCount),
+      tone: !openCount ? 'success' : cases.every((x) => x.label === 'likely_stale') ? 'warning' : 'error',
+      status: !openCount ? 'None open' : cases.every((x) => x.label === 'likely_stale') ? 'Probably outdated' : active.length ? 'Active complaints' : 'Open case' },
+    { section: 'costs', glyph: 'money', label: 'Property tax', value: null, tone: 'neutral', status: claims.price ? 'A month at asking' : 'A month at assessed value' },
+    buyouts.length
+      ? { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: `Buyout ${year(buyouts[0].buyout_agreement_date ?? buyouts[0].pre_buyout_disclosure_declaration_date)}`, tone: 'warning', status: unitsNow >= 2 && preRentControl ? 'Rent rules likely' : 'Past buyout' }
+      : hotel.length ? { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: 'Short-term', tone: 'warning', status: 'Hotel-tax registration' }
+      : { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: 'None found', tone: 'success', status: 'No buyouts on file' },
+    { section: 'hazards', glyph: firstNote?.key === 'reservoir' ? 'reservoir' : firstNote?.key === 'landslide' ? 'landslide' : /flood/.test(firstNote?.key ?? '') ? 'flood' : 'hazard', label: 'Hazards',
+      value: hazards.length ? `${notes.length} of ${hazards.length}` : null, tone: !hazards.length ? 'neutral' : notes.length ? 'warning' : 'success', status: hazardStatus },
+    sb9 ? { section: 'upside', glyph: 'grow', label: 'Room to grow', value: 'Lot split', tone: 'info', status: 'Check SB 9 rules' }
+      : { section: 'upside', glyph: 'zoning', label: 'Room to grow', value: zoning, tone: 'info', status: historic ? 'Historic district' : zoning && /^RH-[23]|^RM/.test(zoning) ? 'More units allowed' : 'Zoning' },
+  ];
+
+  /* ----- highlights ----- */
+  const good: string[] = [];
+  const watch: string[] = [];
+  if (unitLegalized && lastUnitPermit) good.push(`In-law legalized and signed off in ${year(lastUnitPermit.completed_date)} ${c(S.permit(lastUnitPermit), unitCfc ? S.cfc(unitCfc) : null)}`);
+  const bathsRow = ledger.find((r) => r.key === 'baths');
+  if (bathsRow && ['permitted_not_updated', 'matches'].includes(bathsRow.label) && finaledBaths.length) good.push(`${cap(word(Number(bathsRow.records)))} baths have plumbing finals ${c(...finaledBaths.map((x) => S.plumbing(x.p)))}`);
+  const roofSys = systems.find((s) => s.title === 'Roof');
+  if (roofSys?.status === 'updated' && roofSys.year && roofSys.year >= input.now.getUTCFullYear() - 5) good.push(`New roof in ${roofSys.year} ${roofSys.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  if (hz?.femaZone && !/^(A|V)/.test(hz.femaZone)) good.push(`Outside FEMA flood zones ${c(S.hazards(pid))}`);
+  if (!cases.length && !failed.has('complaints')) good.push('No open complaints or city cases');
+  if (!buyouts.length && !failed.has('tenants')) good.push(`No tenant buyouts on file ${c(S.noBuyout(pid))}`.replace(` ${c(S.noBuyout(pid))}`, cites.has(`buyout:${pid}`) ? ` ${c(S.noBuyout(pid))}` : ''));
+  for (const x of cases) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${x.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `${x.title} ${x.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the in-law unit ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  for (const r of ledger.filter((r) => r.label === 'permitted_not_finaled')) watch.push(`${r.title} permitted, not signed off ${r.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  for (const b of buyouts.slice(0, 1)) watch.push(`Tenant buyout in ${year(b.buyout_agreement_date)}: ${money(n(b.buyout_amount) ?? 0)} to ${n(b.number_of_tenants) ?? ''} tenants ${c(S.buyout(b, addr.display, addrUpper))}`);
+  if (hotel.length) watch.push(`Hotel-tax registration since ${year(hotelStart)}, a sign of short-term rentals ${c(hotelSrc)}`);
+  for (const h of notes) watch.push(h.key === 'reservoir' ? `Inside the ${hz?.reservoirs?.length === 2 && hz.reservoirs.every((r) => /^Sunset/.test(r)) ? 'Sunset' : (hz?.reservoirs ?? []).join(' and ')} reservoirs failure zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
+    : `${h.title}: ${h.text.split(/(?<=\])/)[0]}`);
+  if (nearby.length) {
+    const first = nearby[0].text;
+    watch.push(/demolition/i.test(first) ? `A demolition and new ${first.match(/(\d+)-unit/)?.[1] ?? ''}-unit building planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.replace('new -unit', 'new') : `${nearby[0].title}: project planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
+  }
+  const clip = (s: string) => (s.length <= 90 ? s : s.slice(0, 87).replace(/\s+\S*$/, '') + '...');
+  const highlights = { good: good.slice(0, 5).map(clip), watch: watch.slice(0, 5).map(clip) };
+  if (!highlights.good.length) highlights.good.push('Records were found for this address');
+  if (!highlights.watch.length) highlights.watch.push('Nothing stands out in the records');
+
+  /* ----- history ----- */
+  const history: HistoryRow[] = [];
+  const cited = (id: string) => cites.has(id) ? `[${cites.list.findIndex((s) => s.id === id) + 1}]` : null;
+  if (firstUnitComplaint) {
+    const ref = cited(`complaint:${firstUnitComplaint.complaint_number}`);
+    if (ref) {
+      history.push({ date: day(firstUnitComplaint.date_filed), kind: 'complaint', text: `Complaint: illegal unit${/garage/.test(complaintText(firstUnitComplaint)) ? ' in the garage' : ''} ${ref}` });
+      const second = unitComplaints.find((x) => /amendment|nov/.test(lower(x.complaint_description)) && x !== firstUnitComplaint);
+      if (second) history.push({ date: String(year(second.date_filed)), kind: 'complaint', text: `Second notice of violation for the same unit ${ref}` });
+    }
+  }
+  for (const a of active) { const ref = cited(`complaint:${a.complaint_number}`); if (ref) history.push({ date: day(a.date_filed), kind: 'complaint', text: `Complaint: ${lower(cases.find((x) => x.text.includes(a.complaint_number!))?.title ?? 'open complaint')} ${ref}` }); }
+  for (const b of buyouts) { const ref = cited(`buyout:${b.case_number}`); if (ref) history.push({ date: day(b.buyout_agreement_date), kind: 'tenant', text: `Tenant buyout, ${n(b.number_of_tenants) ?? ''} tenants ${ref}`.replace(',  tenants', '') }); }
+  if (roll?.current_sales_date && rollSrc) history.push({ date: roll.current_sales_date.slice(0, 7), kind: 'sale', text: `Current owner bought the house ${c(rollSrc)}` });
+  for (const p of openPlanning) { const ref = cited(`planning:${p.record_id}`); if (ref) history.push({ date: day(p.open_date), kind: 'planning', text: `Planning opens case ${p.record_id} ${ref}` }); }
+  if (hotelSrc && hotelStart) history.push({ date: day(hotelStart), kind: 'other', text: `Hotel-tax registration starts ${c(hotelSrc)}` });
+  for (const p of permits) {
+    const ref = cited(`permit:${p.permit_number}`);
+    if (!ref) continue;
+    const d = lower(p.description);
+    if (p === lastUnitPermit && unitCfc) continue;
+    const label = /re-?roof|roofing/.test(d) ? 'Reroof' : /bedroom.*office/.test(d) ? 'Upstairs bedroom converted to an office' : /remodel|slab|garage/.test(d) ? 'Remodel permit' : /foundation/.test(d) ? 'Foundation permit' : `Permit ${p.permit_number}`;
+    if (isComplete(p)) history.push({ date: day(p.completed_date), kind: 'permit', text: `${label}${label.startsWith('Upstairs') ? '' : ' complete'} ${ref}` });
+    else history.push({ date: day(p.issued_date ?? p.filed_date), kind: 'permit', text: `${label} issued ${ref}` });
+  }
+  if (finaledBaths.length) {
+    const ref = cited(`plumbing:${finaledBaths[0].p.permit_number}`);
+    const total = Number(ledger.find((r) => r.key === 'baths')?.records ?? 0);
+    if (ref) history.push({ date: day(finaledBaths.map((x) => x.p.completed_date).sort().pop()), kind: 'permit', text: `Plumbing finals for ${total ? word(total) + ' baths' : 'new baths'} ${ref}` });
+  }
+  if (unitCfc) { const ref = cited(`cfc:${unitCfc.building_permit_application}`); if (ref) history.push({ date: day(unitCfc.date_issued), kind: 'permit', text: `In-law legalized, certificate issued ${ref}` }); }
+  history.sort((a, b) => a.date.localeCompare(b.date));
+
+  /* ----- sections ----- */
+  const err = (source: string): SectionState => ({ state: 'error', source, retryable: true });
+  const sections: Record<SectionKey, SectionState> = {
+    ledger: failed.has('permits') ? err('DBI building permits') : ledger.length ? { state: 'ok' } : { state: 'empty', text: 'The listing makes no claims to check' },
+    cases: failed.has('complaints') ? err('DBI complaints') : cases.length ? { state: 'ok' } : { state: 'empty', text: 'No open city cases' },
+    costs: { state: 'ok' },
+    systems: failed.has('permits') && failed.has('trade_permits') ? err('DBI permits') : failed.has('trade_permits') ? err('DBI plumbing and electrical permits') : { state: 'ok' },
+    tenants: failed.has('tenants') ? err('Rent Board buyouts') : { state: 'ok' },
+    upside: failed.has('zoning') && !upside.length ? err('Planning zoning map') : upside.length ? { state: 'ok' } : { state: 'empty', text: 'No zoning record found' },
+    hazards: failed.has('hazards') || !hazards.length ? err('Hazard maps') : { state: 'ok' },
+    nearby: failed.has('nearby') ? err('Planning projects nearby') : nearby.length ? { state: 'ok' } : { state: 'empty', text: 'No projects within 150 m' },
+    history: history.length ? { state: 'ok' } : { state: 'empty', text: 'No dated records found' },
+    unknowns: unknowns.length ? { state: 'ok' } : { state: 'empty', text: 'Nothing left to ask' },
+    packet: { state: 'empty', text: 'No disclosure packet added' },
+  };
+
+  /* ----- answer and drafts (rule sentences; writer.ts may improve them) ----- */
+  const answer = ruleAnswer({ unitsNow, unitLegalized, lastUnitPermit, unitCfc, rollSrc, ledger, cases, c, tone, active, aduRow });
+  const drafts = ruleDrafts({ addr, unknowns, cases, openPlanning, lastUnitPermit, unitCfc, agentEmail: input.agentEmail, permits, ledger, active });
+
+  return {
+    id: input.reportId,
+    version: 1,
+    createdAt: input.now.toISOString(),
+    checkedAt: input.now.toISOString(),
+    address: addr.display,
+    parcels: addr.parcels.map((p) => p.parcel),
+    parcelDisplay: parcelDisplay(addr.parcels),
+    meta: { zoning, neighborhood: roll?.assessor_neighborhood ?? addr.neighborhood ?? null, yearBuilt, lotSqft },
+    listing: { text: input.listingText, claims },
+    answer,
+    decision,
+    glance,
+    highlights,
+    sections,
+    ledger,
+    cases,
+    costs: { price, assessedValue: assessed, rows, inputs },
+    systems,
+    tenants,
+    upside,
+    hazards,
+    nearby,
+    history,
+    unknowns,
+    sources: cites.list,
+    actions: [],
+    drafts,
+  };
+}
+
+function ruleAnswer(x: { unitsNow: number; unitLegalized: boolean; lastUnitPermit: Row | null; unitCfc: Row | null; rollSrc: ReturnType<typeof S.roll> | null; ledger: ClaimRow[]; cases: CaseRow[]; c: (...s: any[]) => string; tone: string; active: Row[]; aduRow?: ClaimRow }): string {
+  const unitsWord = x.unitsNow === 1 ? 'one-unit' : `${word(x.unitsNow)}-unit`;
+  if (x.unitLegalized && x.lastUnitPermit) {
+    const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
+    return `A legal ${unitsWord} home. The in-law was legalized and signed off in ${year(x.lastUnitPermit.completed_date)} ${x.c(S.permit(x.lastUnitPermit), x.unitCfc ? S.cfc(x.unitCfc) : null)}${stale ? `, so the assessor still showing ${x.unitsNow - 1 === 1 ? 'one unit' : 'fewer units'} and one bath is out of date ${x.c(x.rollSrc)}` : ''}.`;
+  }
+  if (x.active.length) {
+    return `A ${unitsWord} home with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}. Work is permitted but not signed off.`;
+  }
+  const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
+  if (problems.length) return `A ${unitsWord} home. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${problems.map((p) => p.title.toLowerCase()).join(', ')}.`;
+  return `A ${unitsWord} home whose records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`;
+}
+
+function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[] }): Report['drafts'] {
+  const a = x.addr.display;
+  const qs: string[] = [];
+  const ids: string[] = [];
+  const add = (id: string, q: string) => { if (x.unknowns.some((u) => u.id === id)) { qs.push(q); ids.push(id); } };
+  add('u-tenants', 'Is either unit currently rented? If so, what are the rents and lease terms?');
+  add('u-short-term', 'City records show a hotel-tax registration at this address. Are any short-term rental bookings scheduled after closing?');
+  add('u-bedrooms', "Could you share the floor plan? Public records don't list bedrooms, and a recent permit converted one to an office.");
+  add('u-garden-unit', 'What is the in-law unit, legally? I could not find a permit that creates a second unit. Does anyone live there?');
+  add('u-close-cases', `Will the active complaints${x.active.length ? ` (${x.active.map((c) => c.complaint_number).join(', ')})` : ''} and open permits be closed before closing, and who pays any fees?`);
+  const docs = [x.lastUnitPermit?.permit_number, ...x.permits.filter((p) => /complete/.test(p.status ?? '') && /remodel|bath|stair|adu/.test(lower(p.description)) && p !== x.lastUnitPermit).map((p) => p.permit_number)].filter(Boolean).slice(0, 2);
+  qs.push(`Could you share the 3R report${docs.length ? `, the job cards for permit${docs.length > 1 ? 's' : ''} ${docs.join(' and ')}` : ''}${x.unitCfc ? `, and the certificate of final completion for ${(x.unitCfc.building_address ?? '').replace(/\s+(Avenue|Street)$/i, '')}` : ''}?`);
+  if (x.openPlanning[0]) qs.push(`Do you know whether Planning has closed enforcement case ${x.openPlanning[0].record_id}?`);
+  const listingAgentEmail: EmailDraft | null = qs.length ? {
+    to: x.agentEmail, subject: `Questions about ${a}`,
+    body: `Hi,\n\nI'm interested in ${a} and have a few questions before making an offer.\n\n${qs.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nThanks,\n`,
+    unknownIds: ids,
+  } : null;
+  const p = x.openPlanning[0];
+  const P = x.addr.parcels[0];
+  let cityEmail: EmailDraft | null = null;
+  if (p && P) {
+    cityEmail = {
+      to: 'pic@sfgov.org', subject: `Status of enforcement case ${p.record_id}, ${a}`,
+      body: `Hello,\n\nI'm considering buying ${a} (block ${P.block}, lot ${P.lot}). Planning case ${p.record_id} still shows "${lower(p.record_status)}"${ILLEGAL_UNIT.test(lower(p.description)) ? ' with an unauthorized unit noted' : ''}.${x.lastUnitPermit && x.unitCfc ? ` The unit was legalized under permit ${x.lastUnitPermit.permit_number}, with a certificate of final completion issued ${fmtDate(x.unitCfc.date_issued)}.` : ''}\n\nCould you confirm whether the case is closed, or what remains open?\n\nThanks,\n`,
+      unknownIds: x.unknowns.filter((u) => u.id === 'u-planning-case').map((u) => u.id),
+    };
+  } else if (x.active.length && P) {
+    cityEmail = {
+      to: 'dbi.cod@sfgov.org', subject: `Status of complaints at ${a}`,
+      body: `Hello,\n\nI'm considering buying ${a} (block ${P.block}, lot ${P.lot}). Complaint${x.active.length > 1 ? 's' : ''} ${x.active.map((c) => c.complaint_number).join(' and ')} show${x.active.length > 1 ? '' : 's'} as active.\n\nCould you tell me what is needed to close ${x.active.length > 1 ? 'them' : 'it'}, and whether any fees or liens are pending?\n\nThanks,\n`,
+      unknownIds: [],
+    };
+  }
+  return { listingAgentEmail, cityEmail };
+}

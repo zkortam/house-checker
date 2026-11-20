@@ -1,0 +1,1 @@
+{"url":"https://data.sf.gov/resource/g8m3-pdis.json?%24where=upper%28full_business_address%29+like+%2763+JULES%25%27+AND+transient_occupancy_tax%3Dtrue&%24select=uniqueid%2Cfull_business_address%2Clocation_start_date%2Clocation_end_date%2Cdba_end_date%2Ctransient_occupancy_tax&%24limit=50","at":"2026-11-20T21:07:54.068Z","body":[]}
