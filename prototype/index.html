@@ -1,0 +1,972 @@
+<title>House Checker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one calm reading column on the canvas; chrome is one frosted header; content is flat rows grouped in solid cards.
+   Tokens follow the Surf design standard (tokens.md, colour-and-effects.md). Values marked ≈ are approximations the docs leave to an unshipped file. */
+:root {
+  color-scheme: light;
+  --font-scale: 1;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text-sm: calc(14px * var(--font-scale)); --lh-sm: 1.4286;
+  --text-body: calc(15px * var(--font-scale)); --lh-body: 1.4667; --ls-body: -0.005em;
+  --text-base: calc(16px * var(--font-scale)); --lh-base: 1.5;
+  --text-lg: calc(18px * var(--font-scale)); --lh-lg: 1.5556; --ls-lg: -0.01em;
+  --text-2xl: calc(24px * var(--font-scale)); --lh-2xl: 1.3333; --ls-2xl: -0.02em;
+  --text-3xl: calc(30px * var(--font-scale)); --lh-3xl: 1.2; --ls-3xl: -0.02em;
+  --text-badge: calc(11px * var(--font-scale));
+  --w-normal: 400; --w-medium: 500; --w-semibold: 600; --w-bold: 700;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+  --card-padding: 16px; --spacing-overlay: 16px;
+  --radius-xs: 8px; --radius-sm: 12px; --radius-md: 16px; --radius-2xl: 28px; --radius-3xl: 32px; --radius-full: 9999px;
+  --blur-header: 12px;
+  --z-sticky: 200; --z-modal: 400; --z-toast: 600; --z-max: 9999;
+  --dur-instant: 75ms; --dur-fast: 150ms; --dur-normal: 200ms; --dur-slow: 300ms; --ovl-dur: 240ms; --exit-ratio: 0.8;
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1); --ease-dialog: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1); --ease-exit: cubic-bezier(0.4, 0, 1, 1); --ease-gentle: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --press: 0.96; --press-subtle: 0.98; --press-opacity: 0.7;
+  --tap: 44px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px; --icon-xl: 24px; --icon-chrome: 26px;
+  --dialog-md: 560px; --header-row: 3.5rem;
+  --reading-column: 560px;
+
+  --ink-rgb: 11 11 18;
+  --canvas: #f4f5f8;
+  --text-primary: rgb(var(--ink-rgb));
+  --text-secondary: rgb(var(--ink-rgb) / 0.66);
+  --text-muted: rgb(var(--ink-rgb) / 0.57);
+  --text-faint: rgb(var(--ink-rgb) / 0.45);
+  --text-inverted: #ffffff;
+  --accent: #2563eb; --on-accent: #ffffff;
+  --cta: rgb(var(--ink-rgb)); --on-cta: #ffffff;
+  --surface-card: #ffffff;           /* ≈ */
+  --surface-overlay: #ffffff;        /* ≈ opaque */
+  --header-glass: rgb(244 245 248 / 0.78); /* ≈ canvas under the one frost */
+  --bg-overlay: rgb(var(--ink-rgb) / 0.06);
+  --glass-border: rgb(var(--ink-rgb) / 0.10);
+  --border-default: rgb(var(--ink-rgb) / 0.14);
+  --shadow-lg: 0 12px 32px rgb(11 11 18 / 0.12);
+  --scrim: rgb(0 0 0 / 0.4);
+  --success: #22c55e; --warning: #f59e0b; --error: #ef4444; --info: #3b82f6;
+  --success-ink: #15803d; --warning-ink: #b45309; --error-ink: #b91c1c; --info-ink: #1d4ed8;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --ink-rgb: 255 255 255; --canvas: #050508;
+  --text-secondary: rgb(var(--ink-rgb) / 0.6); --text-muted: rgb(var(--ink-rgb) / 0.46); --text-faint: rgb(var(--ink-rgb) / 0.35);
+  --text-inverted: #060a1e; --cta: #ffffff; --on-cta: #060a1e;
+  --surface-card: #111217; --surface-overlay: #111217; --header-glass: rgb(5 5 8 / 0.72);
+  --bg-overlay: rgb(var(--ink-rgb) / 0.08); --glass-border: rgb(var(--ink-rgb) / 0.10); --border-default: rgb(var(--ink-rgb) / 0.16);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  --success-ink: #22c55e; --warning-ink: #f59e0b; --error-ink: #ef4444; --info-ink: #3b82f6;
+} }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink-rgb: 255 255 255; --canvas: #050508;
+  --text-secondary: rgb(var(--ink-rgb) / 0.6); --text-muted: rgb(var(--ink-rgb) / 0.46); --text-faint: rgb(var(--ink-rgb) / 0.35);
+  --text-inverted: #060a1e; --cta: #ffffff; --on-cta: #060a1e;
+  --surface-card: #111217; --surface-overlay: #111217; --header-glass: rgb(5 5 8 / 0.72);
+  --bg-overlay: rgb(var(--ink-rgb) / 0.08); --glass-border: rgb(var(--ink-rgb) / 0.10); --border-default: rgb(var(--ink-rgb) / 0.16);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  --success-ink: #22c55e; --warning-ink: #f59e0b; --error-ink: #ef4444; --info-ink: #3b82f6;
+}
+@media (min-width: 640px) { :root { --spacing-overlay: 20px; } }
+@media (min-width: 1280px) { :root { --reading-column: 600px; } }
+@media (min-width: 1440px) { :root { --reading-column: 640px; } }
+
+html { scrollbar-gutter: stable; overscroll-behavior-y: none; }
+* { box-sizing: border-box; scrollbar-width: thin; }
+body {
+  margin: 0; background: var(--canvas); color: var(--text-primary);
+  font-family: var(--font-sans); font-size: var(--text-body); line-height: var(--lh-body); letter-spacing: var(--ls-body);
+  -webkit-font-smoothing: antialiased; touch-action: manipulation; overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent; overflow-x: clip;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--canvas); }
+button, a, [role=button] { cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 8px; top: -100px; z-index: var(--z-max); background: var(--cta); color: var(--on-cta); padding: 8px 12px; border-radius: var(--radius-sm); }
+.skip:focus { top: 8px; }
+.num { font-variant-numeric: tabular-nums; }
+svg.g { width: var(--icon-lg); height: var(--icon-lg); flex: none; fill: none; stroke: currentColor; stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- Header: the one frosted layer ---- */
+.header {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: var(--z-sticky);
+  background: var(--header-glass); backdrop-filter: blur(var(--blur-header)); -webkit-backdrop-filter: blur(var(--blur-header));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.header-row { max-width: var(--reading-column); margin: 0 auto; height: var(--header-row); display: flex; align-items: center; gap: var(--sp-2); }
+.header-title { flex: 1; min-width: 0; font-size: var(--text-body); font-weight: var(--w-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wordmark { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-primary); }
+.icon-btn {
+  appearance: none; border: 0; background: transparent; color: var(--text-secondary);
+  width: 48px; height: 48px; border-radius: var(--radius-full); display: grid; place-items: center; flex: none;
+  transition: transform var(--dur-fast) var(--ease-smooth), background-color var(--dur-fast) var(--ease-smooth), color var(--dur-fast) var(--ease-smooth);
+}
+.icon-btn svg.g { width: var(--icon-chrome); height: var(--icon-chrome); }
+@media (hover: hover) and (pointer: fine) { .icon-btn:hover { background: var(--bg-overlay); color: var(--text-primary); } }
+.icon-btn:active { transform: scale(var(--press)); transition-duration: 0s; }
+
+/* ---- Page ---- */
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: var(--sp-6) var(--sp-16); }
+.column { max-width: var(--reading-column); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-8); }
+.view[hidden] { display: none !important; }
+h1 { margin: 0; font-size: var(--text-2xl); line-height: var(--lh-2xl); letter-spacing: var(--ls-2xl); font-weight: var(--w-bold); text-wrap: balance; }
+.group { display: flex; flex-direction: column; gap: var(--sp-2); }
+.section-label { margin: 0; padding-inline: var(--card-padding); font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: var(--w-medium); color: var(--text-muted); }
+.card { background: var(--surface-card); border-radius: var(--radius-2xl); padding: var(--sp-2) 0; }
+.card-pad { padding: var(--card-padding); }
+.meta { display: flex; flex-wrap: wrap; column-gap: var(--sp-3); row-gap: 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-muted); }
+.lead { font-size: var(--text-lg); line-height: var(--lh-lg); letter-spacing: var(--ls-lg); color: var(--text-primary); margin: 0; text-wrap: pretty; }
+p { margin: 0; }
+
+/* ---- Buttons ---- */
+.btn {
+  appearance: none; border: 0; font: inherit; font-weight: var(--w-semibold); font-size: var(--text-body);
+  height: 48px; padding: 0 var(--sp-5); border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  transition: transform var(--dur-fast) var(--ease-smooth), opacity var(--dur-fast) var(--ease-smooth), background-color var(--dur-fast) var(--ease-smooth);
+}
+.btn:active { transform: scale(var(--press)); transition-duration: 0s; }
+.btn-primary { background: var(--cta); color: var(--on-cta); }
+.btn-quiet { background: var(--bg-overlay); color: var(--text-primary); }
+.btn-text { background: transparent; color: var(--text-primary); padding: 0 var(--sp-3); }
+.btn[aria-disabled="true"] { opacity: 0.4; }
+@media (hover: hover) and (pointer: fine) { .btn-text:hover, .btn-quiet:hover { background: var(--bg-overlay); } }
+.link { color: var(--text-primary); text-decoration: underline; text-decoration-color: var(--border-default); text-underline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: currentColor; } }
+
+/* ---- Start view ---- */
+.field-wrap { background: var(--surface-card); border-radius: var(--radius-2xl); padding: var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-2); }
+.field-wrap.invalid { box-shadow: inset 0 0 0 2px var(--error); }
+textarea.field {
+  width: 100%; resize: none; border: 0; outline: none; background: transparent; color: var(--text-primary);
+  font: inherit; font-size: var(--text-base); line-height: var(--lh-base); padding: var(--sp-3) var(--sp-3) 0; min-height: 168px;
+}
+textarea.field::placeholder { color: var(--text-muted); }
+.field-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: 0 0 0 var(--sp-1); }
+.field-error { color: var(--error-ink); font-size: var(--text-sm); padding-inline: var(--card-padding); min-height: 20px; }
+.chips { display: flex; gap: var(--sp-2); overflow-x: auto; padding-inline: var(--sp-1); scrollbar-width: none; }
+.chip-btn {
+  appearance: none; border: 0; font: inherit; font-size: var(--text-sm); font-weight: var(--w-medium); white-space: nowrap;
+  height: 40px; padding: 0 var(--sp-4); border-radius: var(--radius-full); background: var(--surface-card); color: var(--text-primary);
+  transition: transform var(--dur-fast) var(--ease-smooth), background-color var(--dur-fast) var(--ease-smooth);
+}
+.chip-btn:active { transform: scale(var(--press)); transition-duration: 0s; }
+.attach { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--text-secondary); font-size: var(--text-sm); font-weight: var(--w-medium); height: 40px; padding: 0 var(--sp-3); border-radius: var(--radius-full); }
+@media (hover: hover) and (pointer: fine) { .attach:hover { background: var(--bg-overlay); color: var(--text-primary); } }
+.attach input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.what { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-4); padding: var(--card-padding); }
+.what div { display: flex; gap: var(--sp-3); align-items: flex-start; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.what svg.g { width: var(--icon-md); height: var(--icon-md); color: var(--text-muted); margin-top: 1px; }
+@media (max-width: 420px) { .what { grid-template-columns: 1fr; } }
+
+/* ---- Rows (the list-row recipe: one gap, ≥44px, no hairlines) ---- */
+.row { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--card-padding); min-height: var(--tap); }
+.row > .g { margin-top: 1px; color: var(--text-secondary); }
+.row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row-title { font-weight: var(--w-medium); color: var(--text-primary); }
+.row-sub { color: var(--text-secondary); }
+.row-end { flex: none; display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); font-size: var(--text-sm); }
+button.row { appearance: none; border: 0; background: transparent; font: inherit; color: inherit; text-align: start; width: 100%; border-radius: var(--radius-md); transition: background-color var(--dur-fast) var(--ease-smooth); }
+@media (hover: hover) and (pointer: fine) { button.row:hover { background: var(--bg-overlay); } }
+.card > .row:first-child, .card > .rowwrap:first-child > .row { border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-md) var(--radius-md); }
+
+/* ---- Status chip: state, never decoration (5% fill, 40% border) ---- */
+.chip {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 var(--sp-2); border-radius: var(--radius-xs);
+  font-size: var(--text-sm); line-height: 1; font-weight: var(--w-medium); white-space: nowrap;
+  color: var(--tone-ink); background: color-mix(in srgb, var(--tone) 5%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent);
+}
+.tone-success { --tone: var(--success); --tone-ink: var(--success-ink); }
+.tone-info { --tone: var(--info); --tone-ink: var(--info-ink); }
+.tone-warning { --tone: var(--warning); --tone-ink: var(--warning-ink); }
+.tone-error { --tone: var(--error); --tone-ink: var(--error-ink); }
+.tone-neutral { --tone: rgb(var(--ink-rgb)); --tone-ink: var(--text-secondary); }
+
+/* ---- Agent steps ---- */
+.steps .row { align-items: center; }
+.step-status { position: relative; width: var(--icon-lg); height: var(--icon-lg); flex: none; }
+.step-status > * { position: absolute; inset: 0; transition: opacity var(--dur-fast) var(--ease-gentle); }
+.step-status .ok { color: var(--text-secondary); }
+.step-status .bad { color: var(--error-ink); }
+.step-count { font-size: var(--text-sm); color: var(--text-muted); transition: opacity var(--dur-fast) var(--ease-gentle); }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.progress-line { padding: 0 var(--card-padding) var(--sp-2); font-size: var(--text-sm); color: var(--text-secondary); min-height: 28px; }
+.steps-summary { display: flex; align-items: center; gap: var(--sp-3); }
+.steps-summary .g { color: var(--text-secondary); }
+
+/* ---- Report ---- */
+.cite { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; margin: 0 1px; border-radius: var(--radius-full); background: var(--bg-overlay); color: var(--text-secondary); font-size: var(--text-badge); font-weight: var(--w-semibold); text-decoration: none; vertical-align: 2px; font-variant-numeric: tabular-nums; }
+@media (hover: hover) and (pointer: fine) { .cite:hover { color: var(--text-primary); } }
+.answer { display: flex; flex-direction: column; gap: var(--sp-4); }
+.answer-head { display: flex; flex-direction: column; gap: var(--sp-2); }
+.decision { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--card-padding); }
+.decision .g { color: var(--text-primary); margin-top: 1px; }
+.disclosure { font-size: var(--text-sm); color: var(--text-muted); }
+
+.ledger-vals { display: flex; flex-wrap: wrap; column-gap: var(--sp-4); row-gap: 2px; font-size: var(--text-sm); color: var(--text-secondary); }
+.ledger-vals b { font-weight: var(--w-medium); color: var(--text-muted); margin-inline-end: var(--sp-1); }
+.ledger-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.caret { color: var(--text-muted); transition: transform var(--dur-normal) var(--ease-smooth); margin-top: 1px; }
+[aria-expanded="true"] .caret { transform: rotate(180deg); }
+.collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-normal) var(--ease-smooth); }
+.collapse.open { grid-template-rows: 1fr; }
+.collapse > div { overflow: hidden; min-height: 0; }
+.evidence { padding: 0 var(--card-padding) var(--sp-3) calc(var(--card-padding) + var(--icon-lg) + var(--sp-3)); display: flex; flex-direction: column; gap: var(--sp-2); color: var(--text-secondary); }
+
+.money { font-weight: var(--w-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.price-field { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--card-padding); }
+.price-field label { flex: 1; color: var(--text-secondary); }
+.price-input { width: 148px; height: 40px; border-radius: var(--radius-sm); border: 0; background: var(--bg-overlay); color: var(--text-primary); font: inherit; font-size: var(--text-base); text-align: end; padding: 0 var(--sp-3); font-variant-numeric: tabular-nums; outline: none; }
+.price-input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.unknown-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-1); }
+.unknown-actions .btn { height: 40px; font-size: var(--text-sm); padding: 0 var(--sp-4); }
+.done-tag { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--success-ink); font-size: var(--text-sm); font-weight: var(--w-medium); }
+
+.sources .row-title { font-weight: var(--w-normal); }
+.src-n { width: var(--icon-lg); flex: none; text-align: center; font-size: var(--text-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+a.row { text-decoration: none; color: inherit; border-radius: var(--radius-md); transition: background-color var(--dur-fast) var(--ease-smooth); }
+@media (hover: hover) and (pointer: fine) { a.row:hover { background: var(--bg-overlay); } }
+.fineprint { font-size: var(--text-sm); color: var(--text-muted); padding-inline: var(--card-padding); }
+.actions-bar { display: flex; gap: var(--sp-2); align-items: center; }
+
+/* Cascade: report sections arrive once, 8px rise, 50ms stagger */
+.cascade > * { animation: rise var(--dur-slow) var(--ease-dialog) both; }
+.cascade > *:nth-child(2) { animation-delay: 50ms; } .cascade > *:nth-child(3) { animation-delay: 100ms; } .cascade > *:nth-child(4) { animation-delay: 150ms; }
+.cascade > *:nth-child(5) { animation-delay: 200ms; } .cascade > *:nth-child(6) { animation-delay: 250ms; } .cascade > *:nth-child(n+7) { animation-delay: 300ms; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- Dialog: bottom sheet under 640, centred panel from 640 ---- */
+dialog.ovl { border: 0; padding: 0; background: var(--surface-overlay); color: var(--text-primary); box-shadow: var(--shadow-lg); max-height: min(92svh, calc(100svh - env(safe-area-inset-top, 0px) - 8px)); overflow: hidden; }
+dialog.ovl::backdrop { background: var(--scrim); opacity: 0; transition: opacity var(--ovl-dur) var(--ease-dialog); }
+dialog.ovl[data-state="open"]::backdrop { opacity: 1; }
+dialog.ovl[data-state="closed"]::backdrop { opacity: 0; transition-duration: calc(var(--ovl-dur) * var(--exit-ratio)); transition-timing-function: var(--ease-exit); }
+dialog.ovl { opacity: 0; transform: translateY(12px); transition: opacity var(--ovl-dur) var(--ease-dialog), transform var(--ovl-dur) var(--ease-dialog); }
+dialog.ovl[data-state="open"] { opacity: 1; transform: none; }
+dialog.ovl[data-state="closed"] { opacity: 0; transform: translateY(12px); transition-duration: calc(var(--ovl-dur) * var(--exit-ratio)); transition-timing-function: var(--ease-exit); pointer-events: none; }
+@media (max-width: 639px) {
+  dialog.ovl { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: var(--radius-2xl) var(--radius-2xl) 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+}
+@media (min-width: 640px) { dialog.ovl { width: min(var(--dialog-md), calc(100vw - 3rem)); border-radius: var(--radius-3xl); } dialog.ovl.sm { width: min(460px, calc(100vw - 3rem)); } }
+.ovl-inner { display: flex; flex-direction: column; gap: var(--spacing-overlay); padding: var(--spacing-overlay); max-height: inherit; overflow: auto; overscroll-behavior: contain; }
+.ovl-head { display: flex; align-items: flex-start; gap: var(--sp-2); }
+.ovl-title { flex: 1; font-size: var(--text-lg); line-height: var(--lh-lg); letter-spacing: var(--ls-lg); font-weight: var(--w-semibold); margin: 0; padding-top: 10px; text-wrap: balance; }
+.ovl-head .icon-btn { width: 44px; height: 44px; margin: 0 -8px 0 0; }
+.ovl-head .icon-btn svg.g { width: var(--icon-lg); height: var(--icon-lg); }
+.form-row { display: flex; flex-direction: column; gap: var(--sp-1); }
+.form-row label { font-size: var(--text-sm); color: var(--text-muted); font-weight: var(--w-medium); }
+.input { height: 48px; border-radius: var(--radius-sm); border: 0; background: var(--bg-overlay); color: var(--text-primary); font: inherit; font-size: var(--text-base); padding: 0 var(--sp-3); outline: none; width: 100%; }
+.input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+.input.invalid { box-shadow: inset 0 0 0 2px var(--error); }
+textarea.input { height: auto; min-height: 260px; padding: var(--sp-3); line-height: var(--lh-base); resize: none; }
+textarea.input:focus { box-shadow: none; }
+.ovl-foot { display: flex; gap: var(--sp-2); justify-content: flex-end; align-items: center; }
+@media (max-width: 639px) { .ovl-foot { flex-direction: row-reverse; justify-content: stretch; } .ovl-foot .btn { flex: 1; } }
+.confirm-facts { display: flex; flex-direction: column; gap: var(--sp-2); color: var(--text-secondary); }
+.slot-list { display: flex; gap: var(--sp-2); overflow-x: auto; scrollbar-width: none; }
+.slot { appearance: none; border: 0; font: inherit; font-size: var(--text-sm); font-weight: var(--w-medium); height: 40px; padding: 0 var(--sp-4); border-radius: var(--radius-full); background: var(--bg-overlay); color: var(--text-primary); white-space: nowrap; transition: transform var(--dur-fast) var(--ease-smooth); }
+.slot[aria-checked="true"] { background: var(--cta); color: var(--on-cta); }
+.slot:active { transform: scale(var(--press)); transition-duration: 0s; }
+
+/* ---- Toast dock ---- */
+.toasts { position: fixed; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: var(--z-toast); display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); pointer-events: none; padding-inline: max(16px, env(safe-area-inset-left, 0px)); }
+.toast {
+  pointer-events: auto; position: relative; overflow: hidden; display: flex; align-items: center; gap: var(--sp-3);
+  min-height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4); border-radius: var(--radius-full);
+  background: var(--cta); color: var(--on-cta); font-weight: var(--w-medium); box-shadow: var(--shadow-lg);
+  animation: toast-in var(--dur-slow) var(--ease-enter) both;
+}
+.toast.out { animation: toast-out calc(var(--dur-slow) * var(--exit-ratio)) var(--ease-exit) both; }
+.toast .btn-text { color: var(--on-cta); height: 36px; font-size: var(--text-body); }
+.toast:not(:has(.btn-text)) { padding-inline-end: var(--sp-4); }
+.drain { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: currentColor; opacity: 0.35; transform-origin: left; transform: scaleX(1); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(12px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cascade > *, .toast, .toast.out { animation-duration: 0.01ms !important; animation-delay: 0s !important; }
+  dialog.ovl, dialog.ovl::backdrop { transform: none !important; transition-duration: var(--dur-fast) !important; }
+  .collapse, .caret { transition-duration: 0.01ms !important; }
+  .spin { animation-duration: 1s !important; }
+  .btn:active, .icon-btn:active, .chip-btn:active, .slot:active { transform: none; opacity: var(--press-opacity); }
+}
+</style>
+
+<a class="skip" href="#content">Skip to content</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-house" viewBox="0 0 256 256"><path d="M40 216V115.5a8 8 0 0 1 2.6-5.9l80-72.7a8 8 0 0 1 10.8 0l80 72.7a8 8 0 0 1 2.6 5.9V216"/><path d="M16 216h224"/><path d="M152 216v-56a8 8 0 0 0-8-8h-32a8 8 0 0 0-8 8v56"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 256 256"><circle cx="128" cy="104" r="32"/><path d="M208 104c0 72-80 128-80 128S48 176 48 104a80 80 0 0 1 160 0Z"/></symbol>
+    <symbol id="i-roll" viewBox="0 0 256 256"><rect x="40" y="40" width="176" height="176" rx="8"/><path d="M40 96h176M96 96v120"/></symbol>
+    <symbol id="i-permit" viewBox="0 0 256 256"><path d="M200 224H56a8 8 0 0 1-8-8V40a8 8 0 0 1 8-8h96l56 56v128a8 8 0 0 1-8 8Z"/><path d="M152 32v56h56M96 136h64M96 168h64"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 256 256"><path d="M208 144c0-72-80-120-80-120S48 72 48 144a80 80 0 0 0 160 0Z"/><path d="M136 192c20-3.4 36.6-20 40-40"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 256 256"><path d="M79.9 210.5A88 88 0 1 0 45.5 176.1l-13.2 39.7a8 8 0 0 0 10.1 10.1Z"/></symbol>
+    <symbol id="i-octagon" viewBox="0 0 256 256"><path d="M164.5 32h-73a8 8 0 0 0-5.6 2.3L34.3 85.9a8 8 0 0 0-2.3 5.6v73a8 8 0 0 0 2.3 5.6l51.6 51.6a8 8 0 0 0 5.6 2.3h73a8 8 0 0 0 5.6-2.3l51.6-51.6a8 8 0 0 0 2.3-5.6v-73a8 8 0 0 0-2.3-5.6l-51.6-51.6a8 8 0 0 0-5.6-2.3Z"/><path d="M128 80v56"/><circle cx="128" cy="172" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-map" viewBox="0 0 256 256"><path d="M96 184l-64 24V48l64-24 64 24 64-24v160l-64 24-64-24Z"/><path d="M96 24v160M160 48v160"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 256 256"><path d="M40 208V56a8 8 0 0 1 8-8h160a8 8 0 0 1 8 8v152l-32-16-32 16-32-16-32 16-32-16Z"/><path d="M80 104h96M80 136h96"/></symbol>
+    <symbol id="i-users" viewBox="0 0 256 256"><circle cx="88" cy="108" r="52"/><path d="M155.4 57.9A52 52 0 1 1 169.5 160M16 197.4a88 88 0 0 1 144 0M169.5 160a87.9 87.9 0 0 1 72 37.4"/></symbol>
+    <symbol id="i-waves" viewBox="0 0 256 256"><path d="M40 104c40-32 56 32 88 0s48 32 88 0M40 168c40-32 56 32 88 0s48 32 88 0"/></symbol>
+    <symbol id="i-grow" viewBox="0 0 256 256"><path d="M32 216h192M56 216V136l72-56 72 56v80"/><path d="M128 24v40M108 44h40"/></symbol>
+    <symbol id="i-crane" viewBox="0 0 256 256"><path d="M72 216V40l120 40H72M72 80h48v136M40 216h112M192 80v40"/><rect x="176" y="120" width="32" height="24" rx="4"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 256 256"><path d="M96 240l16-80-64-24L160 16l-16 80 64 24Z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 256 256"><path d="M32 176l96 56 96-56M32 128l96 56 96-56M32 80l96 56 96-56-96-56Z"/></symbol>
+    <symbol id="i-question" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><path d="M128 144v-8c17.7 0 32-12.5 32-28s-14.3-28-32-28-32 12.5-32 28v4"/><circle cx="128" cy="180" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-check" viewBox="0 0 256 256"><path d="M40 144l56 56L224 72"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><path d="M88 136l24 24 56-56"/></symbol>
+    <symbol id="i-x" viewBox="0 0 256 256"><path d="M200 56L56 200M200 200L56 56"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><path d="M128 80v56"/><circle cx="128" cy="172" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-back" viewBox="0 0 256 256"><path d="M216 128H40M112 56l-72 72 72 72"/></symbol>
+    <symbol id="i-out" viewBox="0 0 256 256"><path d="M64 192L192 64M88 64h104v104"/></symbol>
+    <symbol id="i-caret" viewBox="0 0 256 256"><path d="M208 96l-80 80-80-80"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 256 256"><rect x="32" y="56" width="192" height="144" rx="8"/><path d="M224 56l-96 88-96-88"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 256 256"><rect x="40" y="40" width="176" height="176" rx="8"/><path d="M176 24v32M80 24v32M40 88h176"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 256 256"><circle cx="128" cy="128" r="48"/><path d="M128 32v16M60.1 60.1l11.3 11.3M32 128h16M60.1 195.9l11.3-11.3M128 224v-16M195.9 195.9l-11.3-11.3M224 128h-16M195.9 60.1l-11.3 11.3"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 256 256"><path d="M108.1 35.6A88 88 0 1 0 220.4 147.9 96 96 0 0 1 108.1 35.6Z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 256 256"><path d="M86 82l42-42 42 42M128 152V40"/><path d="M176 104h24a8 8 0 0 1 8 8v96a8 8 0 0 1-8 8H56a8 8 0 0 1-8-8v-96a8 8 0 0 1 8-8h24"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 256 256"><path d="M160 80l-83.3 84.7a16 16 0 0 0 22.6 22.6L198.6 86.6a32 32 0 0 0-45.2-45.2L54.1 142.1a48 48 0 0 0 67.9 67.9L204 128"/></symbol>
+    <symbol id="i-brief" viewBox="0 0 256 256"><rect x="32" y="72" width="192" height="136" rx="8"/><path d="M168 72V56a16 16 0 0 0-16-16h-48a16 16 0 0 0-16 16v16M32 128h192"/></symbol>
+    <symbol id="i-building" viewBox="0 0 256 256"><path d="M16 216h224M144 216V40a8 8 0 0 0-8-8H40a8 8 0 0 0-8 8v176M224 216V104a8 8 0 0 0-8-8h-72M64 72h32M80 136h32M64 176h32M176 136h16M176 176h16"/></symbol>
+    <symbol id="i-spinner" viewBox="0 0 256 256"><path d="M128 32a96 96 0 1 1-96 96" /></symbol>
+  </defs>
+</svg>
+
+<header class="header">
+  <div class="header-row">
+    <button class="icon-btn" id="backBtn" type="button" aria-label="Back" hidden><svg class="g"><use href="#i-back"/></svg></button>
+    <div class="header-title" id="headerTitle"><span class="wordmark"><svg class="g" aria-hidden="true"><use href="#i-house"/></svg>House Checker</span></div>
+    <button class="icon-btn" id="shareBtn" type="button" aria-label="Copy link to this report" hidden><svg class="g"><use href="#i-share"/></svg></button>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch to light theme"><svg class="g"><use href="#i-sun"/></svg></button>
+  </div>
+</header>
+
+<main id="content" tabindex="-1">
+  <!-- START -->
+  <section class="view column" id="viewStart" aria-labelledby="startTitle">
+    <h1 id="startTitle">Check a home</h1>
+    <form class="group" id="checkForm" novalidate>
+      <div class="field-wrap" id="fieldWrap">
+        <label for="listing" class="sr-only">Listing text or address</label>
+        <textarea class="field" id="listing" name="listing" placeholder="Paste the listing text or an address in San Francisco" autocomplete="street-address" autocapitalize="sentences" spellcheck="false" enterkeyhint="go"></textarea>
+        <div class="field-foot">
+          <label class="attach" for="packet"><svg class="g" aria-hidden="true" style="width:var(--icon-md);height:var(--icon-md)"><use href="#i-clip"/></svg><span id="packetLabel">Add disclosure packet</span><input type="file" id="packet" accept="application/pdf"></label>
+          <button class="btn btn-primary" type="submit" id="checkBtn">Check this home</button>
+        </div>
+      </div>
+      <div class="field-error" id="fieldError" role="alert" aria-live="assertive"></div>
+      <div class="chips" role="group" aria-label="Example listings">
+        <button class="chip-btn" type="button" data-fill="p2055">2055 42nd Ave</button>
+        <button class="chip-btn" type="button" data-fill="p57">57 Carmelita St</button>
+      </div>
+    </form>
+    <div class="group">
+      <h2 class="section-label">What you get</h2>
+      <div class="card what">
+        <div><svg class="g" aria-hidden="true"><use href="#i-house"/></svg><span>What the house legally is, checked against the listing</span></div>
+        <div><svg class="g" aria-hidden="true"><use href="#i-octagon"/></svg><span>Open city cases and unpermitted work</span></div>
+        <div><svg class="g" aria-hidden="true"><use href="#i-receipt"/></svg><span>What it will cost to own at your price</span></div>
+        <div><svg class="g" aria-hidden="true"><use href="#i-users"/></svg><span>Tenants and rent control</span></div>
+        <div><svg class="g" aria-hidden="true"><use href="#i-grow"/></svg><span>What you're allowed to build</span></div>
+        <div><svg class="g" aria-hidden="true"><use href="#i-question"/></svg><span>What's still unknown, and the request that settles it</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORT (working + report share one page) -->
+  <section class="view column" id="viewReport" hidden aria-labelledby="reportTitle">
+    <div class="answer-head">
+      <h1 id="reportTitle"></h1>
+      <div class="meta num" id="reportMeta"></div>
+    </div>
+
+    <div class="group" id="stepsGroup">
+      <h2 class="section-label" id="stepsLabel">Checking city records</h2>
+      <div class="card steps" id="steps" aria-live="polite"></div>
+    </div>
+
+    <div id="reportBody" class="column cascade" hidden></div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<dialog class="ovl" id="emailDlg" aria-labelledby="emailTitle">
+  <form class="ovl-inner" id="emailForm" method="dialog" novalidate>
+    <div class="ovl-head">
+      <h2 class="ovl-title" id="emailTitle">Email the listing agent</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="form-row"><label for="emailTo">To</label><input class="input" id="emailTo" type="email" inputmode="email" autocomplete="email" placeholder="Listing agent's email" enterkeyhint="next"></div>
+    <div class="form-row"><label for="emailSubject">Subject</label><input class="input" id="emailSubject" type="text" autocomplete="off" enterkeyhint="next"></div>
+    <div class="form-row"><label for="emailBody" class="sr-only">Message</label><textarea class="input" id="emailBody" data-autofocus></textarea></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary" type="submit" style="min-width:104px">Send</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ovl" id="bookDlg" aria-labelledby="bookTitle">
+  <form class="ovl-inner" id="bookForm" method="dialog" novalidate>
+    <div class="ovl-head">
+      <h2 class="ovl-title" id="bookTitle">Choose a time</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="confirm-facts" id="bookFacts"></div>
+    <div class="slot-list" role="radiogroup" aria-label="Times" id="slots"></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary" type="submit" id="bookContinue" style="min-width:104px">Continue</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ovl sm" id="confirmDlg" aria-labelledby="confirmTitle">
+  <form class="ovl-inner" method="dialog" id="confirmForm">
+    <h2 class="ovl-title" id="confirmTitle" style="padding-top:0"></h2>
+    <div class="confirm-facts" id="confirmFacts"></div>
+    <div class="ovl-foot">
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary" type="submit" style="min-width:104px">Book</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function () {
+'use strict';
+var LOCALE = undefined; // the viewer's locale
+var EMPTY = '—';    // EMPTY_VALUE, the only em dash allowed on screen
+var nf = new Intl.NumberFormat(LOCALE);
+var usd = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+var dShort = new Intl.DateTimeFormat(LOCALE, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+var tShort = new Intl.DateTimeFormat(LOCALE, { hour: 'numeric', minute: '2-digit' });
+var dSlot = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', month: 'short', day: 'numeric' });
+var pr = new Intl.PluralRules(LOCALE);
+function plural(n, one, other) { return (pr.select(n) === 'one' ? one : other).replace('{n}', nf.format(n)); }
+function day(iso) { var p = iso.split('-').map(Number); return dShort.format(new Date(Date.UTC(p[0], p[1] - 1, p[2] || 1))); }
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function $(id) { return document.getElementById(id); }
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+var R = 'https://data.sf.gov/resource/';
+
+/* ===== Data: real City records (DataSF, checked Nov 20, 2026). Listing text is an example. ===== */
+var P = {
+  p2055: {
+    slug: 'r-2055-42nd-ave', address: '2055 42nd Ave', parcel: '2162-008', zoning: 'RH-1', built: 1947, hood: 'Outer Sunset',
+    ask: 1595000,
+    listing: 'Example listing: 2055 42nd Ave, San Francisco. Fully remodeled Sunset home with a legal in-law. 2 units, 3 bed, 4 bath, about 2,000 sq ft. Offered at $1,595,000.',
+    steps: [
+      { g: 'i-pin', t: 'Found the parcel', done: '2162-008 and 2055A', ms: 500 },
+      { g: 'i-roll', t: "Read the assessor's roll", done: 'as of Jan 1, 2025', ms: 900 },
+      { g: 'i-permit', t: 'Read building permits', done: '7 permits', ms: 1400, count: 7 },
+      { g: 'i-drop', t: 'Read plumbing permits', done: '2 with final inspections', ms: 1700, count: 2 },
+      { g: 'i-chat', t: 'Read complaints and notices of violation', done: '4 complaints, all closed', ms: 1900, count: 4 },
+      { g: 'i-building', t: 'Read Planning records', done: '3 records', ms: 2200 },
+      { g: 'i-waves', t: 'Checked hazard zones', done: 'Flood zone X', ms: 2400 },
+      { g: 'i-receipt', t: 'Worked out taxes and fees', done: 'at the asking price', ms: 2600 }
+    ],
+    answer: 'A legal two-unit home. The ground-floor unit was legalized in 2025 [2][4] after illegal-unit complaints from 2014 to 2018 [6]. Plumbing finals support four baths [3], though the assessor still lists one bath and one unit [1].',
+    decision: { g: 'i-check-circle', title: 'Records answer the big questions', text: 'A standard inspection covering both units is enough. One Planning case still reads "under review" and is worth one question to Planning.' },
+    ledger: [
+      { k: 'Units', listing: '2', records: '2, ADU certified May 16, 2025', label: 'Permitted, assessor not updated', tone: 'info', why: 'Permit 202301190427 legalized the ground-floor unit under the ADU program and closed it out with a certificate of final completion [2][4]. The assessor’s roll is a snapshot from Jan 1, 2025, before that work finished [1].' },
+      { k: 'Baths', listing: '4', records: '4 with plumbing finals', label: 'Permitted, assessor not updated', tone: 'info', why: 'Two plumbing permits passed final inspection on Apr 30, 2025: two baths in the ADU and two new baths upstairs [3][5]. The assessor still records 1 bath [1].' },
+      { k: 'Sq ft', listing: '2,000', records: '2,006 Planning, 1,300 assessor', label: 'Matches Planning records', tone: 'success', why: 'Planning approved the ADU project at 2,006 sq ft of floor area, up from 1,216 [7]. The assessor’s 1,300 predates the work [1].' },
+      { k: 'In-law', listing: 'Legal', records: 'Legalized 2025', label: 'Resolved', tone: 'success', why: 'Complaints in 2014, 2017 and 2018 cited an illegal unit with no windows or ventilation in the bedroom [6]. The 2023 permit was filed to comply with both notices of violation and is complete [2].' },
+      { k: 'Bedrooms', listing: '3', records: EMPTY, label: "Records don't settle this", tone: 'neutral', why: 'The assessor leaves bedrooms blank for this parcel. A 2025 permit converted one upstairs bedroom to an office [8]. Ask for the floor plan.' }
+    ],
+    cases: [
+      { g: 'i-building', t: 'Planning enforcement case still "under review"', sub: 'Case 2022-007735ENF, opened Jul 11, 2022, notes "UDU found" (an unauthorized unit). The unit was certified in 2025, so this is likely stale.', label: 'Likely stale', tone: 'warning', cite: [7] }
+    ],
+    casesEmpty: null,
+    bones: [
+      { g: 'i-drop', t: 'Plumbing', sub: 'Both units replumbed for new baths and kitchens, final Apr 30, 2025', cite: [3, 5] },
+      { g: 'i-layers', t: 'Roof', sub: 'Reroofed, permit complete Mar 6, 2025', cite: [9] },
+      { g: 'i-bolt', t: 'Wiring', sub: 'Electrical permits filed with the 2024 remodel, complete', cite: [10] },
+      { g: 'i-house', t: 'Foundation and sewer lateral', sub: 'No permit on record. Built 1947, so ask the inspector to look at both.', muted: true }
+    ],
+    money: { assessedNote: 'Sold Feb 2022' },
+    tenants: [
+      { g: 'i-users', t: 'Rent control', sub: 'Two units in a building from 1947. Units like these are usually covered by eviction protections, and often by rent limits. Confirm with the Rent Board before you plan to move in or rent out.' },
+      { g: 'i-chat', t: 'Tenants now', sub: "Not in public records. The 2014 complaint described a renter in the garage unit. Ask whether either unit is occupied." }
+    ],
+    upside: [
+      { g: 'i-map', t: 'Zoning RH-1', sub: 'Residential, one-family district. The legalized ADU is the second unit.' },
+      { g: 'i-grow', t: 'Lot 2,996 sq ft', sub: 'Above the 2,400 sq ft minimum for an SB 9 lot split. SB 9 is off the table if a unit was rented in the last 3 years. [1]' }
+    ],
+    around: [
+      { g: 'i-waves', t: 'Flood', sub: 'FEMA zone X, minimal flood hazard', cite: [11] },
+      { g: 'i-pin', t: 'Seismic hazard zones', sub: 'Outside the state liquefaction and landslide zones', cite: [11] }
+    ],
+    history: [
+      ['2014-08-05', 'Complaint: illegal unit in the garage', 6],
+      ['2017', 'Second notice of violation for the same unit', 6],
+      ['2022-02', 'Current owner bought the house', 1],
+      ['2022-07-11', 'Planning opens enforcement case 2022-007735ENF', 7],
+      ['2025-04-30', 'Plumbing finals for four baths', 3],
+      ['2025-05-16', 'ADU legalization complete, certificate issued', 4],
+      ['2025-07-08', 'Upstairs bedroom converted to an office', 8]
+    ],
+    unknowns: [
+      { id: 'u1', t: 'Is the Planning case closed?', sub: 'Case 2022-007735ENF still reads "under review". A clean close-out protects resale.', who: 'Planning', action: 'email', to: 'Planning' },
+      { id: 'u2', t: 'Is either unit rented?', sub: 'A tenant changes when you can move in and what you can charge.', who: 'Listing agent', action: 'email' },
+      { id: 'u3', t: 'How many bedrooms are there now?', sub: 'Records leave bedrooms blank and one was turned into an office.', who: 'Listing agent', action: 'email' }
+    ],
+    sources: [
+      ["Assessor's roll 2025, parcel 2162008", 'SF Assessor-Recorder', 'Jan 1, 2025', R + 'wv5m-vpq2.json?parcel_number=2162008&closed_roll_year=2025'],
+      ['Building permit 202301190427, ADU legalization', 'DBI', 'May 16, 2025', R + 'i98e-djp9.json?permit_number=202301190427'],
+      ['Plumbing permit PP20240724049, ADU baths', 'DBI', 'Apr 30, 2025', R + 'a6aw-rudh.json?permit_number=PP20240724049'],
+      ['Certificate of final completion, 2055A', 'DBI', 'May 16, 2025', R + 'j67f-aayr.json?building_permit_application=202301190427'],
+      ['Plumbing permit PP20240926192, upstairs baths', 'DBI', 'Apr 30, 2025', R + 'a6aw-rudh.json?permit_number=PP20240926192'],
+      ['Complaint 201488731, illegal unit', 'DBI', 'Aug 5, 2014', R + 'gm2e-bten.json?complaint_number=201488731'],
+      ['Planning case 2022-007735ENF', 'SF Planning', 'Jul 11, 2022', 'https://sfplanninggis.org/pim?search=2022-007735ENF'],
+      ['Building permit 202506047951, bedroom to office', 'DBI', 'Jul 8, 2025', R + 'i98e-djp9.json?permit_number=202506047951'],
+      ['Building permit 202502261145, reroof', 'DBI', 'Mar 6, 2025', R + 'i98e-djp9.json?permit_number=202502261145'],
+      ['Electrical permits, block 2162 lot 008', 'DBI', '2024 to 2025', R + 'ftty-kx6y.json?block=2162&lot=008'],
+      ['FEMA flood map and state seismic hazard zones', 'FEMA, California Geological Survey', '2021', 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28'],
+      ['Tax rate resolution, FY 2026-27', 'Board of Supervisors', 'Sep 22, 2026', 'https://media.api.sf.gov/documents/r0524-26.pdf'],
+      ['Supplemental assessments', 'SF Assessor-Recorder', '2026', 'https://www.sf.gov/information--learn-about-supplemental-assessments'],
+      ['Who pays what: California transfer taxes', 'Fidelity National Financial', 'Jan 6, 2026', 'https://page.fnf.com/rs/393-REY-847/images/Who%20Pays%20What%20-%20California%20Transfer%20Tax%20and%20Fees%20%28rev%2001062026%29.pdf']
+    ],
+    av: 1483566, taxSrc: [12, 13, 14],
+    email: function () {
+      return 'Hi,\n\nI’m interested in 2055 42nd Ave and have a few questions before making an offer.\n\n1. Is either unit currently rented? If so, what are the rents and lease terms?\n2. Could you share the floor plan? Public records don’t list bedrooms, and a 2025 permit converted one to an office.\n3. Could you share the 3R report, the job cards for permits 202301190427 and 202408057968, and the certificate of final completion for 2055A?\n4. Do you know whether Planning has closed enforcement case 2022-007735ENF?\n\nThanks,\n';
+    },
+    booking: null
+  },
+  p57: {
+    slug: 'r-57-carmelita-st', address: '57 Carmelita St', parcel: '0863-007', zoning: 'RH-2', built: 1900, hood: 'Duboce Triangle',
+    ask: 3295000,
+    listing: 'Example listing: 57 Carmelita St, San Francisco. Duboce Park Victorian, fully renovated 2026. 3 bed, 3 bath, about 2,700 sq ft, garden in-law. Offered at $3,295,000.',
+    steps: [
+      { g: 'i-pin', t: 'Found the parcel', done: '0863-007', ms: 500 },
+      { g: 'i-roll', t: "Read the assessor's roll", done: 'as of Jan 1, 2025', ms: 900 },
+      { g: 'i-permit', t: 'Read building permits', done: '3 open permits', ms: 1400, count: 3 },
+      { g: 'i-drop', t: 'Read plumbing and electrical permits', done: '2 issued, none final', ms: 1700 },
+      { g: 'i-chat', t: 'Read complaints and notices of violation', done: '2 active', ms: 1900 },
+      { g: 'i-building', t: 'Read Planning records', done: '2 records, historic district', ms: 2200 },
+      { g: 'i-waves', t: 'Checked hazard zones', done: 'Flood zone X', ms: 2400 },
+      { g: 'i-receipt', t: 'Worked out taxes and fees', done: 'at the asking price', ms: 2600 }
+    ],
+    answer: 'A remodel in progress with two active building complaints: excavation before a shoring permit [3] and over-excavation at the rear filed Nov 17, 2026 [4]. The $617k permit and the plumbing for three baths are issued but not finaled [2][5]. No permit covers a garden unit [2].',
+    decision: { g: 'i-warn', title: 'Worth a structural engineer before you offer', text: 'Only a site visit can say whether the excavation is sound. The rest the seller can answer in writing.' },
+    ledger: [
+      { k: 'Renovated', listing: '2026', records: 'Permit issued, not finaled', label: 'Open city case', tone: 'error', why: 'Permit 202510157458 ($616,835) was issued Mar 27, 2026 and has no final inspection [2]. Two complaints during the work are active [3][4].' },
+      { k: 'Baths', listing: '3', records: '1 assessor, 3 permitted', label: 'Permitted, not finaled', tone: 'warning', why: 'Plumbing permit PP20260427726 covers three bathrooms and is issued, with no final inspection [5]. The assessor records 1 bath [1].' },
+      { k: 'In-law', listing: 'Garden in-law', records: 'No unit permitted', label: 'No permit found', tone: 'error', why: 'The remodel permit keeps the building at one unit [2]. Complaints in 2021 and 2022 asked about an unpermitted garden apartment, and Planning closed a short-term rental case in 2021 [6].' },
+      { k: 'Sq ft', listing: '2,700', records: '2,745 Planning, 1,900 assessor', label: 'Records disagree', tone: 'neutral', why: 'Planning lists 2,745 sq ft of existing floor area [6]; the assessor lists 1,900 [1]. Ask how the listing measured it.' },
+      { k: 'Units', listing: '1 plus in-law', records: '1', label: 'Records differ from listing', tone: 'warning', why: 'Every record for this parcel shows one legal unit [1][2].' }
+    ],
+    cases: [
+      { g: 'i-octagon', t: 'Over-excavation at the rear', sub: 'Complaint 202665866, filed Nov 17, 2026. Work without a permit and work beyond the permit.', label: 'Open city case', tone: 'error', cite: [4] },
+      { g: 'i-octagon', t: 'Excavation before a shoring permit', sub: 'Complaint 202655072, filed Apr 24, 2026. A 20 ft section along the south property line was dug about 5 ft deep. Monthly monitoring fee applies.', label: 'Open city case', tone: 'error', cite: [3] }
+    ],
+    bones: [
+      { g: 'i-drop', t: 'Plumbing', sub: 'Galvanized pipes and main stack being replaced, permit issued, not final', cite: [5] },
+      { g: 'i-bolt', t: 'Wiring', sub: 'Electrical permit issued with the remodel, not final', cite: [7] },
+      { g: 'i-layers', t: 'Foundation', sub: 'New lower slab and grade beams under the open excavation complaints', cite: [2, 3] }
+    ],
+    tenants: [
+      { g: 'i-users', t: 'Rent control', sub: 'One legal unit. A rented garden unit, permitted or not, can bring eviction protections with it. Confirm with the Rent Board.' }
+    ],
+    upside: [
+      { g: 'i-map', t: 'Zoning RH-2', sub: 'Residential, two-family district. A second unit is allowed in principle; it needs its own permit.' },
+      { g: 'i-building', t: 'Historic district', sub: 'In the Duboce Park landmark district, so exterior changes go through historic review.' }
+    ],
+    around: [
+      { g: 'i-waves', t: 'Flood', sub: 'FEMA zone X, minimal flood hazard', cite: [8] }
+    ],
+    history: [
+      ['2016', 'Planning case: short-term rental of a possible unpermitted unit, abated 2021', 6],
+      ['2021', 'Complaints about a garden apartment, closed with no notice', 6],
+      ['2023-12', 'Current owner bought the house', 1],
+      ['2026-03-27', 'Remodel permit issued, $616,835', 2],
+      ['2026-04-24', 'Complaint: excavation before a shoring permit', 3],
+      ['2026-11-17', 'Complaint: over-excavation at the rear', 4]
+    ],
+    unknowns: [
+      { id: 'v1', t: 'Is the excavation sound?', sub: 'Two active complaints about digging along the property line. Only a site visit answers this.', who: 'Structural engineer', action: 'book' },
+      { id: 'v2', t: 'Will the complaints and permits close before you do?', sub: 'An open case passes to the next owner, and so do its fees.', who: 'Listing agent', action: 'email' },
+      { id: 'v3', t: 'What is the garden in-law, legally?', sub: 'No permit creates a second unit. Ask whether anyone lives there.', who: 'Listing agent', action: 'email' }
+    ],
+    sources: [
+      ["Assessor's roll 2025, parcel 0863007", 'SF Assessor-Recorder', 'Jan 1, 2025', R + 'wv5m-vpq2.json?parcel_number=0863007&closed_roll_year=2025'],
+      ['Building permit 202510157458, remodel', 'DBI', 'Mar 27, 2026', R + 'i98e-djp9.json?permit_number=202510157458'],
+      ['Complaint 202655072, excavation', 'DBI', 'Apr 24, 2026', R + 'gm2e-bten.json?complaint_number=202655072'],
+      ['Complaint 202665866, over-excavation', 'DBI', 'Nov 17, 2026', R + 'gm2e-bten.json?complaint_number=202665866'],
+      ['Plumbing permit PP20260427726, three baths', 'DBI', '2026', R + 'a6aw-rudh.json?permit_number=PP20260427726'],
+      ['Planning records, block 0863 lot 007', 'SF Planning', '2016 to 2025', R + 'y673-d69b.json?block=0863&lot=007'],
+      ['Electrical permit E20260427566', 'DBI', '2026', R + 'ftty-kx6y.json?block=0863&lot=007'],
+      ['FEMA flood map', 'FEMA', '2021', 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28'],
+      ['Tax rate resolution, FY 2026-27', 'Board of Supervisors', 'Sep 22, 2026', 'https://media.api.sf.gov/documents/r0524-26.pdf'],
+      ['Supplemental assessments', 'SF Assessor-Recorder', '2026', 'https://www.sf.gov/information--learn-about-supplemental-assessments'],
+      ['Who pays what: California transfer taxes', 'Fidelity National Financial', 'Jan 6, 2026', 'https://page.fnf.com/rs/393-REY-847/images/Who%20Pays%20What%20-%20California%20Transfer%20Tax%20and%20Fees%20%28rev%2001062026%29.pdf'],
+      ['Penalties and code enforcement fees 2026', 'DBI', 'Jul 12, 2026', 'https://media.api.sf.gov/documents/Table_1A-K_-_Penalities_Hearings_Code_Enforcement_Assessments_2026.pdf']
+    ],
+    av: 2703000, taxSrc: [9, 10, 11],
+    extraCost: { g: 'i-octagon', t: 'Open complaint fees', v: '$152 a month', sub: 'Violation monitoring while the complaints stay open. Work without a permit adds 9 times the permit issuance fee [12]' },
+    email: function () {
+      return 'Hi,\n\nI’m interested in 57 Carmelita St and have a few questions before making an offer.\n\n1. What is the status of complaints 202655072 and 202665866? Will they be closed, with fees paid, before closing?\n2. When do you expect final inspections on permits 202510157458, PP20260427726 and E20260427566?\n3. The listing mentions a garden in-law. Is it a permitted unit, and is anyone living there?\n4. Could you share the 3R report, the shoring plans and the engineer’s letters for the excavation?\n\nThanks,\n';
+    },
+    booking: { who: 'Example structural engineer', scope: 'Excavation and shoring along the south property line and rear, per complaints 202655072 and 202665866', price: 950 }
+  }
+};
+
+/* ===== Taxes (research/money.md): FY 2026-27 rate, flat parcel taxes, supplemental proration, Art. 12-C transfer tax ===== */
+var TAX = {
+  rate: 0.0118162182, flat: 796, hox: 7000,
+  transferRate: function (p) { return p <= 250000 ? 0.005 : p < 1000000 ? 0.0068 : p < 5000000 ? 0.0075 : p < 10000000 ? 0.0225 : p < 25000000 ? 0.055 : 0.06; },
+  compute: function (p, d) {
+    var pct = new Intl.NumberFormat(LOCALE, { style: 'percent', maximumFractionDigits: 4 });
+    var annual = (p - this.hox) * this.rate + this.flat;
+    var now = new Date(), start = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+    var fyEnd = new Date(start.getMonth() > 5 ? start.getFullYear() + 1 : start.getFullYear(), 6, 1);
+    var months = (fyEnd.getFullYear() - start.getFullYear()) * 12 + (fyEnd.getMonth() - start.getMonth());
+    var supp = (p - d.av) * this.rate * (months / 12);
+    var tr = this.transferRate(p), tt = p * tr, s = d.taxSrc;
+    var rows = [
+      { g: 'i-receipt', t: 'Property tax', v: usd.format(annual) + ' a year', sub: pct.format(this.rate) + ' of your price after the ' + usd.format(this.hox) + ' homeowners’ exemption, plus about ' + usd.format(this.flat) + ' in flat parcel taxes [' + s[0] + ']' },
+      supp > 0
+        ? { g: 'i-receipt', t: 'Supplemental tax bill', v: usd.format(supp), sub: 'One-time catch-up from the current assessed value of ' + usd.format(d.av) + ' if you close next month. It arrives 6 to 12 months after closing [' + s[1] + ']' }
+        : { g: 'i-receipt', t: 'Supplemental tax bill', v: usd.format(0), sub: 'Your price is below the current assessed value of ' + usd.format(d.av) + ', so expect a refund bill, not a charge [' + s[1] + ']' },
+      { g: 'i-receipt', t: 'Transfer tax', v: usd.format(tt), sub: pct.format(tr) + ' of the full price. In San Francisco the seller usually pays it [' + s[2] + ']' }
+    ];
+    if (d.extraCost) rows.push(d.extraCost);
+    return rows;
+  }
+};
+
+/* ===== Theme toggle ===== */
+var root = document.documentElement;
+function scheme() { var t = root.getAttribute('data-theme'); if (t) return t; return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+function paintThemeBtn() { var s = scheme(); $('themeBtn').setAttribute('aria-label', s === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); $('themeBtn').querySelector('use').setAttribute('href', s === 'dark' ? '#i-sun' : '#i-moon'); }
+$('themeBtn').addEventListener('click', function () { root.setAttribute('data-theme', scheme() === 'dark' ? 'light' : 'dark'); paintThemeBtn(); });
+paintThemeBtn();
+document.addEventListener('touchstart', function () {}, { passive: true });
+
+/* ===== Toasts (one dock, 4s outcome, 5s undo) ===== */
+function toast(msg, opts) {
+  opts = opts || {};
+  var dock = $('toasts');
+  while (dock.children.length >= 3) dock.removeChild(dock.firstChild);
+  var el = document.createElement('div'); el.className = 'toast';
+  var span = document.createElement('span'); span.textContent = msg; el.appendChild(span);
+  var life = opts.undo ? 5000 : 4000, done = false, timer;
+  function close(run) { if (done) return; done = true; clearTimeout(timer); el.classList.add('out'); setTimeout(function () { el.remove(); }, 240); if (run) run(); }
+  if (opts.undo) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-text'; b.textContent = 'Undo';
+    b.addEventListener('click', function () { close(opts.undo); }); el.appendChild(b);
+    var d = document.createElement('div'); d.className = 'drain'; el.appendChild(d);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { d.style.transition = 'transform ' + life + 'ms linear'; d.style.transform = 'scaleX(0)'; }); });
+  }
+  dock.appendChild(el);
+  timer = setTimeout(function () { close(opts.expire); }, life);
+}
+
+/* ===== Overlays: native dialog, open and exit share one duration ===== */
+var opener = null;
+function openDlg(dlg) {
+  opener = document.activeElement;
+  dlg.setAttribute('data-state', 'closed'); dlg.showModal();
+  requestAnimationFrame(function () { dlg.setAttribute('data-state', 'open'); });
+  var f = dlg.querySelector('[data-autofocus]'); if (f) setTimeout(function () { f.focus({ preventScroll: true }); }, 240);
+}
+function closeDlg(dlg, then) {
+  if (!dlg.open) return;
+  dlg.setAttribute('data-state', 'closed');
+  setTimeout(function () { dlg.close(); if (opener && opener.focus) opener.focus({ preventScroll: true }); if (then) then(); }, 192);
+}
+document.querySelectorAll('dialog.ovl').forEach(function (dlg) {
+  dlg.addEventListener('cancel', function (e) { e.preventDefault(); closeDlg(dlg); });
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) closeDlg(dlg); });
+  dlg.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', function () { closeDlg(dlg); }); });
+});
+
+/* ===== Routing on the hash: start, or one report per home ===== */
+var current = null, runToken = 0, actionsDone = {};
+function bySlug(slug) { for (var k in P) if (P[k].slug === slug) return k; return null; }
+function route() {
+  var h = location.hash.replace('#', '');
+  var key = bySlug(h);
+  if (key) showReport(key); else showStart();
+}
+window.addEventListener('hashchange', route);
+$('backBtn').addEventListener('click', function () { location.hash = ''; });
+$('shareBtn').addEventListener('click', function () {
+  var url = location.href;
+  try { navigator.clipboard.writeText(url).then(function () { toast('Link copied'); }, function () { toast("Couldn't copy the link"); }); }
+  catch (e) { toast("Couldn't copy the link"); }
+});
+
+function setHeader(title) {
+  var t = $('headerTitle');
+  if (title) { t.textContent = title; $('backBtn').hidden = false; $('shareBtn').hidden = false; document.title = title + ' on House Checker'; }
+  else { t.innerHTML = '<span class="wordmark"><svg class="g" aria-hidden="true"><use href="#i-house"/></svg>House Checker</span>'; $('backBtn').hidden = true; $('shareBtn').hidden = true; document.title = 'Check a home on House Checker'; }
+}
+
+/* ===== Start ===== */
+var listing = $('listing');
+listing.value = store('hc-draft') || '';
+listing.addEventListener('input', function () { store('hc-draft', listing.value); if ($('fieldWrap').classList.contains('invalid')) { /* errors clear on next submit, never while typing */ } });
+document.querySelectorAll('[data-fill]').forEach(function (b) {
+  b.addEventListener('click', function () { listing.value = P[b.getAttribute('data-fill')].listing; store('hc-draft', listing.value); listing.focus(); });
+});
+$('packet').addEventListener('change', function () { var f = this.files && this.files[0]; $('packetLabel').textContent = f ? f.name : 'Add disclosure packet'; });
+$('checkForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var v = listing.value.toLowerCase(), key = null;
+  if (/2055\s*(a\s*)?42nd/.test(v)) key = 'p2055'; else if (/57\s*carmelita/.test(v)) key = 'p57';
+  if (!v.trim()) return fieldError('Paste the listing text or an address');
+  if (!key) return fieldError('This prototype covers 2055 42nd Ave and 57 Carmelita St');
+  fieldError('');
+  try { sessionStorage.removeItem('hc-ran-' + P[key].slug); } catch (err) {}
+  location.hash = P[key].slug;
+});
+function fieldError(msg) { $('fieldError').textContent = msg; $('fieldWrap').classList.toggle('invalid', !!msg); if (msg) listing.focus(); }
+
+function showStart() {
+  runToken++; current = null;
+  $('viewReport').hidden = true; $('viewStart').hidden = false; setHeader(null);
+  window.scrollTo(0, 0);
+}
+
+/* ===== Report ===== */
+function cites(text) {
+  return esc(text).replace(/\[(\d+)\]/g, function (m, n) { return '<a class="cite" href="#" data-src="' + n + '" aria-label="Source ' + n + '">' + n + '</a>'; });
+}
+function citeList(arr) { return (arr || []).map(function (n) { return '[' + n + ']'; }).join(''); }
+function chip(label, tone) { return '<span class="chip tone-' + tone + '">' + esc(label) + '</span>'; }
+function icon(id) { return '<svg class="g" aria-hidden="true"><use href="#' + id + '"/></svg>'; }
+
+function showReport(key) {
+  var d = P[key]; current = key; var token = ++runToken;
+  $('viewStart').hidden = true; $('viewReport').hidden = false; setHeader(d.address);
+  $('reportTitle').textContent = d.address;
+  var meta = ['Parcel ' + d.parcel, d.zoning, d.hood];
+  if (d.built) meta.push('Built ' + d.built);
+  $('reportMeta').innerHTML = meta.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('');
+  window.scrollTo(0, 0);
+  var ran = false; try { ran = sessionStorage.getItem('hc-ran-' + d.slug) === '1'; } catch (e) {}
+  renderSteps(d, ran);
+  $('reportBody').hidden = true; $('reportBody').innerHTML = '';
+  if (ran) { finish(d, token, false); return; }
+  var total = d.steps.length, doneCount = 0;
+  d.steps.forEach(function (s, i) {
+    setTimeout(function () {
+      if (token !== runToken) return;
+      var row = $('steps').querySelector('[data-step="' + i + '"]');
+      row.querySelector('.spin-wrap').style.opacity = 0; row.querySelector('.ok').style.opacity = 1;
+      row.querySelector('.step-count').textContent = s.done;
+      doneCount++;
+      $('progress').textContent = doneCount < total ? plural(total - doneCount, '{n} source left', '{n} sources left') : 'Comparing with the listing';
+      if (doneCount === total) setTimeout(function () { if (token === runToken) { try { sessionStorage.setItem('hc-ran-' + d.slug, '1'); } catch (e) {} finish(d, token, true); } }, 700);
+    }, s.ms);
+  });
+}
+
+function renderSteps(d, collapsed) {
+  var el = $('steps');
+  if (collapsed) {
+    $('stepsLabel').textContent = 'City records';
+    el.innerHTML = '<div class="row steps-summary">' + icon('i-check-circle') + '<div class="row-body"><span class="row-title">Read ' + esc(plural(d.steps.length, '{n} city source', '{n} city sources')) + '</span><span class="meta"><span>Checked ' + esc(tShort.format(new Date())) + '</span></span></div></div>';
+    return;
+  }
+  $('stepsLabel').textContent = 'Checking city records';
+  el.innerHTML = d.steps.map(function (s, i) {
+    return '<div class="row" data-step="' + i + '">' + icon(s.g) +
+      '<div class="row-body"><span class="row-title">' + esc(s.t) + '</span><span class="step-count num"></span></div>' +
+      '<span class="step-status"><span class="spin-wrap" style="opacity:1"><svg class="g spin" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-spinner"/></svg></span><svg class="g ok" style="opacity:0" aria-hidden="true"><use href="#i-check"/></svg></span></div>';
+  }).join('') + '<div class="progress-line" id="progress">' + esc(plural(d.steps.length, '{n} source left', '{n} sources left')) + '</div>';
+}
+
+function finish(d, token, fresh) {
+  if (token !== runToken) return;
+  renderSteps(d, true);
+  var b = $('reportBody'); var key = current;
+  var html = '';
+
+  // 1. Short answer + decision
+  html += '<div class="answer"><p class="lead">' + cites(d.answer) + '</p>' +
+    '<div class="card decision">' + icon(d.decision.g) + '<div class="row-body"><span class="row-title">' + esc(d.decision.title) + '</span><span class="row-sub">' + esc(d.decision.text) + '</span></div></div>' +
+    '<p class="disclosure">Written by AI from the city records below.</p></div>';
+
+  // 2. Listing vs records
+  html += '<div class="group"><h2 class="section-label">What you’re buying</h2><div class="card">' +
+    d.ledger.map(function (r, i) {
+      var id = 'ev-' + i;
+      return '<div class="rowwrap"><button class="row" type="button" aria-expanded="false" aria-controls="' + id + '">' +
+        '<div class="row-body"><div class="ledger-head"><span class="row-title">' + esc(r.k) + '</span>' + chip(r.label, r.tone) + '</div>' +
+        '<div class="ledger-vals num"><span><b>Listing</b>' + esc(r.listing) + '</span><span><b>Records</b>' + esc(r.records) + '</span></div></div>' +
+        '<svg class="g caret" aria-hidden="true"><use href="#i-caret"/></svg></button>' +
+        '<div class="collapse" id="' + id + '"><div><div class="evidence"><p>' + cites(r.why) + '</p></div></div></div></div>';
+    }).join('') + '</div></div>';
+
+  // 3. Open cases
+  html += '<div class="group"><h2 class="section-label">Open city cases</h2><div class="card">' +
+    (d.cases.length ? d.cases.map(function (c) {
+      return '<div class="row">' + icon(c.g) + '<div class="row-body"><div class="ledger-head"><span class="row-title">' + esc(c.t) + '</span>' + chip(c.label, c.tone) + '</div><span class="row-sub">' + cites(c.sub + ' ' + citeList(c.cite)) + '</span></div></div>';
+    }).join('') : '<div class="row">' + icon('i-check-circle') + '<div class="row-body"><span class="row-title">No open city cases</span></div></div>') + '</div></div>';
+
+  // 4. Cost
+  html += '<div class="group"><h2 class="section-label">What it will cost</h2><div class="card" id="costCard">' + costRows(d, d.ask) + '</div></div>';
+
+  // 5. Bones
+  html += '<div class="group"><h2 class="section-label">The bones</h2><div class="card">' + d.bones.map(function (r) {
+    return '<div class="row">' + icon(r.g) + '<div class="row-body"><span class="row-title">' + esc(r.t) + '</span><span class="row-sub"' + (r.muted ? ' style="color:var(--text-muted)"' : '') + '>' + cites(r.sub + ' ' + citeList(r.cite)) + '</span></div></div>';
+  }).join('') + '</div></div>';
+
+  // 6. Tenants
+  html += simpleGroup('Tenants and rent control', d.tenants);
+  // 7. Upside
+  html += simpleGroup('What you can do with it', d.upside);
+  // 8. Around
+  html += simpleGroup('Around the house', d.around);
+
+  // 9. Still unknown
+  html += '<div class="group"><h2 class="section-label">Still unknown</h2><div class="card">' + d.unknowns.map(function (u) {
+    var done = actionsDone[key + u.id];
+    var act = done ? '<span class="done-tag">' + icon('i-check') + esc(done) + '</span>' :
+      (u.action === 'book' ? '<button class="btn btn-quiet" type="button" data-book="' + u.id + '">' + icon('i-cal') + 'Book a ' + esc(u.who.toLowerCase()) + '</button>'
+        : '<button class="btn btn-quiet" type="button" data-email="' + u.id + '">' + icon('i-mail') + 'Ask ' + (u.who === 'Planning' ? 'Planning' : 'the listing agent') + '</button>');
+    return '<div class="row">' + icon('i-question') + '<div class="row-body"><span class="row-title">' + esc(u.t) + '</span><span class="row-sub">' + esc(u.sub) + '</span><div class="unknown-actions">' + act + '</div></div></div>';
+  }).join('') + '</div></div>';
+
+  // 10. History
+  html += '<div class="group"><h2 class="section-label">History</h2><div class="card">' + d.history.map(function (h) {
+    var dt = /^\d{4}-\d{2}-\d{2}$/.test(h[0]) ? day(h[0]) : (/^\d{4}-\d{2}$/.test(h[0]) ? new Intl.DateTimeFormat(LOCALE, { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(+h[0].slice(0, 4), +h[0].slice(5) - 1, 1))) : h[0]);
+    return '<div class="row"><span class="src-n num" style="width:auto;min-width:92px;text-align:start">' + esc(dt) + '</span><div class="row-body"><span class="row-sub" style="color:var(--text-primary)">' + cites(h[1] + ' [' + h[2] + ']') + '</span></div></div>';
+  }).join('') + '</div></div>';
+
+  // 11. Sources
+  html += '<div class="group" id="sources"><h2 class="section-label">Sources</h2><div class="card sources">' + d.sources.map(function (s, i) {
+    return '<a class="row" id="src-' + (i + 1) + '" href="' + esc(s[3]) + '" target="_blank" rel="noopener"><span class="src-n">' + (i + 1) + '</span><div class="row-body"><span class="row-title">' + esc(s[0]) + '</span><span class="meta"><span>' + esc(s[1]) + '</span><span>' + esc(s[2]) + '</span></span></div><svg class="g" aria-hidden="true" style="color:var(--text-muted);width:var(--icon-md);height:var(--icon-md);margin-top:2px"><use href="#i-out"/></svg></a>';
+  }).join('') + '</div><p class="fineprint">Checked ' + esc(tShort.format(new Date())) + '. Compares the listing’s claims with public City records. It is not an inspection, appraisal or legal advice. Records can be incomplete, and unpermitted work may not appear in any record.</p></div>';
+
+  b.innerHTML = html;
+  if (!fresh) b.classList.remove('cascade'); else b.classList.add('cascade');
+  b.hidden = false;
+  wireReport(d);
+}
+
+function simpleGroup(label, rows) {
+  return '<div class="group"><h2 class="section-label">' + esc(label) + '</h2><div class="card">' + rows.map(function (r) {
+    return '<div class="row">' + icon(r.g) + '<div class="row-body"><span class="row-title">' + esc(r.t) + '</span><span class="row-sub">' + cites(r.sub + ' ' + citeList(r.cite)) + '</span></div></div>';
+  }).join('') + '</div></div>';
+}
+
+function costRows(d, price) {
+  var rows = '<div class="price-field"><label for="price">Your price</label><input class="price-input" id="price" inputmode="numeric" autocomplete="off" value="' + esc(nf.format(price)) + '" aria-describedby="priceNote"></div>';
+  if (!TAX) {
+    rows += '<div class="row">' + icon('i-receipt') + '<div class="row-body"><span class="row-title">Property tax</span><span class="row-sub" id="priceNote">' + EMPTY + '</span></div></div>';
+    return rows;
+  }
+  var c = TAX.compute(price, d);
+  return rows + c.map(function (r) {
+    return '<div class="row">' + icon(r.g) + '<div class="row-body"><div class="ledger-head"><span class="row-title">' + esc(r.t) + '</span><span class="money">' + esc(r.v) + '</span></div><span class="row-sub">' + cites(r.sub) + '</span></div></div>';
+  }).join('');
+}
+
+function wireReport(d) {
+  var b = $('reportBody');
+  b.querySelectorAll('button.row[aria-controls]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      $(btn.getAttribute('aria-controls')).classList.toggle('open', !open);
+    });
+  });
+  $('viewReport').querySelectorAll('.cite').forEach(function (a) {
+    a.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); var t = $('src-' + a.getAttribute('data-src')); if (t) { t.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); t.focus({ preventScroll: true }); } });
+  });
+  var price = $('price');
+  if (price) price.addEventListener('change', function () {
+    var n = parseInt(price.value.replace(/[^\d]/g, ''), 10);
+    if (!n || n < 10000) { price.value = nf.format(d.ask); return; }
+    $('costCard').innerHTML = costRows(d, n); wireReport(d);
+  });
+  b.querySelectorAll('[data-email]').forEach(function (btn) { btn.addEventListener('click', function () { openEmail(d, btn.getAttribute('data-email')); }); });
+  b.querySelectorAll('[data-book]').forEach(function (btn) { btn.addEventListener('click', function () { openBook(d, btn.getAttribute('data-book')); }); });
+}
+
+/* ===== Email: draft autosaves; Send is held 5s with Undo, then sent ===== */
+var emailCtx = null;
+function openEmail(d, uid) {
+  var u = d.unknowns.filter(function (x) { return x.id === uid; })[0];
+  var toPlanning = u.to === 'Planning';
+  emailCtx = { d: d, ids: d.unknowns.filter(function (x) { return x.action === 'email' && (x.to === 'Planning') === toPlanning; }).map(function (x) { return x.id; }), toPlanning: toPlanning };
+  var k = 'hc-email-' + d.slug + (toPlanning ? '-planning' : '');
+  var saved = null; try { saved = JSON.parse(store(k) || 'null'); } catch (e) {}
+  $('emailTitle').textContent = toPlanning ? 'Ask Planning' : 'Email the listing agent';
+  $('emailTo').value = saved ? saved.to : (toPlanning ? 'pic@sfgov.org' : '');
+  $('emailSubject').value = saved ? saved.subject : (toPlanning ? 'Status of enforcement case 2022-007735ENF, ' + d.address : 'Questions about ' + d.address);
+  $('emailBody').value = saved ? saved.body : (toPlanning ? 'Hello,\n\nI’m considering buying ' + d.address + ' (block 2162, lot 008). Planning case 2022-007735ENF still shows "under review" with an unauthorized unit noted. The unit was legalized under permit 202301190427, with a certificate of final completion issued May 16, 2025.\n\nCould you confirm whether the case is closed, or what remains open?\n\nThanks,\n' : d.email());
+  $('emailTo').classList.remove('invalid');
+  emailCtx.key = k;
+  openDlg($('emailDlg'));
+}
+['emailTo', 'emailSubject', 'emailBody'].forEach(function (id) {
+  $(id).addEventListener('input', function () { if (emailCtx) store(emailCtx.key, JSON.stringify({ to: $('emailTo').value, subject: $('emailSubject').value, body: $('emailBody').value })); });
+});
+$('emailForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var to = $('emailTo').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { $('emailTo').classList.add('invalid'); $('emailTo').focus(); return; }
+  $('emailTo').classList.remove('invalid');
+  var ctx = emailCtx, key = current;
+  closeDlg($('emailDlg'), function () {
+    ctx.ids.forEach(function (id) { actionsDone[key + id] = 'Sending'; });
+    refreshUnknowns();
+    toast('Email sending', {
+      undo: function () { ctx.ids.forEach(function (id) { delete actionsDone[key + id]; }); refreshUnknowns(); toast('Email not sent'); },
+      expire: function () {
+        var when = tShort.format(new Date());
+        ctx.ids.forEach(function (id) { actionsDone[key + id] = (ctx.toPlanning ? 'Asked Planning ' : 'Emailed the listing agent ') + when; });
+        store(ctx.key, null); refreshUnknowns(); toast('Email sent');
+      }
+    });
+  });
+});
+function refreshUnknowns() { if (!current) return; var y = window.scrollY; finish(P[current], runToken, false); window.scrollTo(0, y); }
+
+/* ===== Booking: choose a time, then confirm (irreversible) ===== */
+var bookCtx = null;
+function openBook(d, uid) {
+  var bk = d.booking; bookCtx = { d: d, uid: uid, slot: null };
+  $('bookTitle').textContent = 'Book a structural engineer';
+  $('bookFacts').innerHTML = '<p><span class="row-title">' + esc(bk.who) + '</span></p><p>' + esc(bk.scope) + '</p><p class="meta"><span>' + esc(usd.format(bk.price)) + ', paid to the engineer</span><span>No paid placement</span></p>';
+  var base = new Date(); var slots = [];
+  for (var i = 1; slots.length < 4; i++) { var dt = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i, i % 2 ? 9 : 13, 0); if (dt.getDay() % 6) slots.push(dt); }
+  $('slots').innerHTML = slots.map(function (s, i) { return '<button class="slot" type="button" role="radio" aria-checked="' + (i === 0) + '" tabindex="' + (i === 0 ? 0 : -1) + '" data-t="' + s.getTime() + '">' + esc(dSlot.format(s) + ', ' + tShort.format(s)) + '</button>'; }).join('');
+  bookCtx.slot = slots[0];
+  $('slots').querySelectorAll('.slot').forEach(function (b) {
+    b.addEventListener('click', function () { $('slots').querySelectorAll('.slot').forEach(function (x) { x.setAttribute('aria-checked', 'false'); x.tabIndex = -1; }); b.setAttribute('aria-checked', 'true'); b.tabIndex = 0; bookCtx.slot = new Date(+b.getAttribute('data-t')); });
+  });
+  openDlg($('bookDlg'));
+}
+$('bookForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var c = bookCtx, s = c.slot;
+  closeDlg($('bookDlg'), function () {
+    $('confirmTitle').textContent = 'Book ' + c.d.booking.who.toLowerCase() + ' for ' + dSlot.format(s) + ', ' + tShort.format(s) + '?';
+    $('confirmFacts').innerHTML = '<p>' + esc(usd.format(c.d.booking.price)) + ', paid to the engineer. The scope and both complaint numbers go in the booking notes.</p>';
+    openDlg($('confirmDlg'));
+  });
+});
+$('confirmForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var c = bookCtx, key = current;
+  closeDlg($('confirmDlg'), function () {
+    actionsDone[key + c.uid] = 'Booked ' + dSlot.format(c.slot) + ', ' + tShort.format(c.slot);
+    refreshUnknowns(); toast('Inspection booked');
+  });
+});
+
+route();
+})();
+</script>

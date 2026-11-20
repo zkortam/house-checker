@@ -1,0 +1,12 @@
+{
+  "name": "house-checker",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Checks a San Francisco listing against city records and acts on what is still unknown.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}
