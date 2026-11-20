@@ -640,3 +640,14 @@ button.b-card:active { transform: scale(var(--press-subtle)); transition-duratio
 .b-huge { font-size: clamp(calc(38px * var(--font-scale)), calc(3.8vw * var(--font-scale)), calc(48px * var(--font-scale))); letter-spacing: -0.04em; }
 .b-big { font-size: clamp(calc(22px * var(--font-scale)), calc(2.1vw * var(--font-scale)), calc(28px * var(--font-scale))); letter-spacing: -0.03em; }
 @media (max-width: 420px) { .claim-v { font-size: calc(15px * var(--font-scale)); } }
+/* Start page: one field, nothing else */
+.column.start { max-width: 680px; padding-top: clamp(24px, 10vh, 120px); gap: var(--sp-6); }
+.start .answer-head { text-align: center; align-items: center; gap: var(--sp-3); }
+.start h1 { margin: 0; font-size: clamp(calc(32px * var(--font-scale)), calc(4.4vw * var(--font-scale)), calc(52px * var(--font-scale))); line-height: 1.08; letter-spacing: -0.04em; font-weight: 700; text-wrap: balance; }
+.start .lead { color: var(--text-secondary); }
+.start .field-wrap { border-radius: 24px; }
+.start textarea.field { min-height: 96px; }
+.start .chips { justify-content: center; gap: var(--sp-1); }
+.start .chip-btn { background: none; color: var(--text-secondary); font-weight: var(--w-medium); }
+@media (hover: hover) and (pointer: fine) { .start .chip-btn:hover { color: var(--text-primary); background: var(--bg-overlay); } }
+.start .btn-fixed { white-space: nowrap; width: auto; min-width: 0; flex: none; padding-inline: var(--sp-5); }

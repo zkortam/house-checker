@@ -42,10 +42,10 @@ export const S = {
   previewText: 'Approved, tax roll behind. Property tax $1,630 a month.',
 
   // Start
-  startTitle: 'Check a home',
-  startLead: "Paste a San Francisco listing. You get what the city's records say about it, in plain words.",
+  startTitle: 'Check any San Francisco home',
+  startLead: "Type an address or paste a listing. See what the city's records say.",
   listingLabel: 'Listing text or address',
-  listingPlaceholder: 'Paste the listing text or an address',
+  listingPlaceholder: 'An address, like 1200 Masonic Ave, or the listing text',
   addPacket: 'Add disclosures',
   removePacket: 'Remove {name}',
   packetNotPdf: 'That file is not a PDF. Add the disclosure packet as a PDF, or remove it.',

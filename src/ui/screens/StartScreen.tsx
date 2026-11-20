@@ -82,7 +82,7 @@ export function StartScreen() {
 
   return (
     <AppShell>
-      <section className="column" aria-labelledby="startTitle">
+      <section className="column start" aria-labelledby="startTitle">
         <div className="answer-head">
           <h1 id="startTitle">{S.startTitle}</h1>
           <p className="lead">{S.startLead}</p>
@@ -110,14 +110,6 @@ export function StartScreen() {
             <ChipButton onClick={() => fillExample('57-carmelita-st')}>{S.example57}</ChipButton>
           </div>
         </form>
-        <Group title={S.whatTitle}>
-          <div className="tiles what-tiles">
-            <div className="tile"><span className="tile-label"><U name="house" />{S.what1Title}</span><span className="row-sub">{S.what1Text}</span></div>
-            <div className="tile"><span className="tile-label"><U name="open" />{S.what2Title}</span><span className="row-sub">{S.what2Text}</span></div>
-            <div className="tile"><span className="tile-label"><U name="cost" />{S.what3Title}</span><span className="row-sub">{S.what3Text}</span></div>
-            <div className="tile"><span className="tile-label"><U name="ask" />{S.what4Title}</span><span className="row-sub">{S.what4Text}</span></div>
-          </div>
-        </Group>
       </section>
     </AppShell>
   );
