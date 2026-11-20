@@ -41,16 +41,17 @@ export function readListingRegex(text: string): ListingClaims {
   const addr = parseAddress(t);
   let price: number | null = null;
   const toPrice = (n: string, unit?: string) => { const base = num(n); return base == null ? null : Math.round(base * (unit ? (/^m/i.test(unit) ? 1_000_000 : 1_000) : 1)); };
-  // A labelled price first ("Offered at $1,595,000", "asking 799k"); otherwise the largest dollar amount that isn't
-  // per month or per year (HOA dues, "Est. $8,912/mo").
+  // A labelled price first ("Offered at $1,595,000", "asking 799k"); otherwise the first dollar amount that isn't per
+  // month, per year or per sqft (HOA dues, "Est. $8,912/mo") and isn't a past sale, estimate or tax figure.
   const labelled = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i)
     ?? t.match(/(?:offered at|asking|list price|priced at)\s*([\d,.]+)\s*(m|million|k)\b/i);
   if (labelled) price = toPrice(labelled[1], labelled[2]);
   if (price == null || price < 10_000) {
     price = null;
-    for (const m of t.matchAll(/\$\s?([\d,.]+)\s*(m|million|k)?\b(?!\s*(?:\/|per|a)\s*(?:mo|month|yr|year))/gi)) {
+    for (const m of t.matchAll(/\$\s?([\d,.]+)\s*(m|million|k)?\b(?!\s*(?:\/|per|a)\s*(?:mo|month|yr|year|sq))/gi)) {
+      if (/\b(sold|zestimate|estimate[sd]?|est\.?|tax(?:es)?|assessed|hoa|rent(?:al)?|history)\b[^$\n]{0,14}$/i.test(t.slice(Math.max(0, m.index! - 24), m.index))) continue;
       const v = toPrice(m[1], m[2]);
-      if (v != null && v >= 10_000 && (price == null || v > price)) price = v;
+      if (v != null && v >= 10_000) { price = v; break; }
     }
   }
   // Counts as digits or words ("Three bedrooms, two baths"); "2 full baths and 1 half bath" is 2.5; a studio has 0 beds.

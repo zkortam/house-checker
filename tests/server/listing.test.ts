@@ -127,3 +127,11 @@ describe('listing prose that looks like an address', () => {
     expect(parseAddress('12 Miles St, SF')?.display).toBe('12 Miles St');
   });
 });
+
+describe('price in a pasted listing page', () => {
+  it('skips Zestimates and past sales', () => {
+    const page = '$1,295,000\n3 bd 2 ba 1,520 sqft\n1214 Fell St, San Francisco, CA 94117\nEst.: $8,204/mo\n$852/sqft  Zestimate®: $1,402,300\nPrice history\n3/1/2008 Sold $1,510,000';
+    expect(readListingRegex(page)).toMatchObject({ price: 1295000, beds: 3, baths: 2, sqft: 1520, address: '1214 Fell St' });
+    expect(readListingRegex('Zestimate: $1,402,300. 1214 Fell St SF. $1,295,000').price).toBe(1295000);
+  });
+});
