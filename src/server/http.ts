@@ -69,7 +69,7 @@ export async function getJson<T = unknown>(url: string, opts: GetOpts = {}): Pro
     if (attempt > 0) await new Promise((r) => setTimeout(r, 300 + Math.random() * 700));
     try {
       // An optional Socrata app token lifts DataSF's anonymous throttling; never logged or recorded.
-      const token = process.env.DATASF_APP_TOKEN && /data\.sf\.gov/.test(url) ? { 'X-App-Token': process.env.DATASF_APP_TOKEN } : {};
+      const token: Record<string, string> = process.env.DATASF_APP_TOKEN && /data\.sf\.gov/.test(url) ? { 'X-App-Token': process.env.DATASF_APP_TOKEN } : {};
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { accept: 'application/json', ...token } });
       if (!res.ok) { lastErr = new FetchError(`HTTP ${res.status}`, 'unavailable', url); if (res.status < 500 && res.status !== 429) break; continue; }
       const body = await res.json();
