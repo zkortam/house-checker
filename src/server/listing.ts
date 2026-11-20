@@ -65,7 +65,7 @@ export function readListingRegex(text: string): ListingClaims {
   const baths = bathM ? [bathM[0], String(Number(count(bathM[1])) + (halfM && !/\./.test(bathM[1]) && halfM.index! > bathM.index! ? (/^(two|2)$/i.test(halfM[1]) ? 1 : 0.5) : 0))] : null;
   // Living area, not the lot: skip a match with "lot" just before it or right after it.
   const sqft = [...t.matchAll(/([\d,]{3,7})\s*(?:\+\s*)?(?:sq\.?\s*ft|square feet|sf\b|sqft)\.?/gi)]
-    .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^\s*(?:\w+\s+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
+    .find((m) => !/\blot(?:\s+size)?\s*:?\s*$/i.test(t.slice(Math.max(0, m.index! - 16), m.index)) && !/^[ \t]*(?:\w+[ \t]+)?lot\b/i.test(t.slice(m.index! + m[0].length, m.index! + m[0].length + 12))) ?? null;
   const units = t.match(/\b(\d+|two|three|four|five|six)[- ]units?\b/i) ?? t.match(/\b(duplex|triplex|fourplex)\b/i);
   let adu: ListingClaims['adu'] = null;
   if (/\b(legal|permitted|legalized|warranted)\s+(in-?law|adu|accessory dwelling|second unit|junior adu|jadu)/i.test(t)) adu = 'legal';
