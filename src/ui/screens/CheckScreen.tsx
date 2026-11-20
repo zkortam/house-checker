@@ -93,7 +93,7 @@ export function CheckScreen({ id }: { id: string }) {
 
           {!live && !report && !fetchError ? <div className="loading-line"><Spinner />{S.loadingReport}</div> : null}
 
-          {live ? <Steps steps={live.steps} progress={live.progress} startedAt={live.startedAt} writing={live.answer.length > 0 && !live.report} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
+          {live ? <Steps steps={live.steps} progress={live.progress} startedAt={live.startedAt} lastEventAt={live.lastEventAt} writing={live.answer.length > 0 && !live.report} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
 
           {live && (live.status === 'failed' || live.status === 'error') && !live.report ? (
             <Card>
@@ -137,9 +137,12 @@ function clock(sec: number): string {
 }
 
 const LONG_WAIT_SEC = 12;
+/** No event for this long after every step finished: offer Retry (never retried on a hidden timer). */
+const STALL_SEC = 60;
 
-function Steps({ steps, progress, startedAt, writing, done, onRetry }: { steps: StepEvent[]; progress: string | null; startedAt: number; writing: boolean; done: boolean; onRetry: () => void }) {
+function Steps({ steps, progress, startedAt, lastEventAt, writing, done, onRetry }: { steps: StepEvent[]; progress: string | null; startedAt: number; lastEventAt: number; writing: boolean; done: boolean; onRetry: () => void }) {
   const elapsed = useElapsed(startedAt, done);
+  const quiet = Math.floor((Date.now() - lastEventAt) / 1000);
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   const failed = steps.filter((s) => s.status === 'failed');
@@ -180,7 +183,8 @@ function Steps({ steps, progress, startedAt, writing, done, onRetry }: { steps: 
       ) : null}
       {!done ? (
         <p className="steps-foot" aria-live="off">
-          {!running && steps.length ? <><Spinner />{writing || !progress ? S.writing : progress}</>
+          {!running && steps.length && quiet >= STALL_SEC ? <>{S.stalled}<Button kind="text" size="sm" onClick={onRetry}>{S.retry}</Button></>
+            : !running && steps.length ? <><Spinner />{writing || !progress ? S.writing : progress}</>
             : elapsed >= LONG_WAIT_SEC ? S.longWait
             : !steps.length ? S.starting
             : fill(S.stepsProgress, { done: steps.filter((x) => x.status !== 'running').length, total: steps.length })}

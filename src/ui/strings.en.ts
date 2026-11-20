@@ -73,6 +73,7 @@ export const S = {
   elapsed: '{time} so far',
   longWait: 'Big buildings have hundreds of records. This can take a minute.',
   writing: 'Writing the summary',
+  stalled: 'The summary is taking longer than usual.',
   stepsProgress: '{done} of {total} sources read',
   stepDone: 'Done',
   stepFailedShort: 'Not finished',
@@ -84,6 +85,7 @@ export const S = {
   // Errors by ApiError kind
   errInvalid: 'Enter a street address in San Francisco',
   errOutsideSf: 'This address is outside San Francisco',
+  errAddressNotFound: 'No San Francisco parcel matches this address. Check the street number and name.',
   errNotFound: 'No report with this link. It may have expired.',
   errOffline: "You're offline. Retry when you're back",
   errTimeout: 'The city records took too long to answer. Retry in a minute.',

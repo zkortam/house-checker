@@ -10,6 +10,7 @@ import { runCheck } from '../api';
 export interface RunState {
   seq: number;
   startedAt: number;
+  lastEventAt: number;
   listingText: string;
   packetFileId?: string;
   reportId: string | null;
@@ -43,7 +44,7 @@ export function startRun(listingText: string, opts: { packetFileId?: string; fai
   const my = ++seq;
   const signal = ctrl.signal;
   set({
-    seq: my, startedAt: Date.now(), listingText, packetFileId: opts.packetFileId, reportId: null, address: null, steps: [], progress: null,
+    seq: my, startedAt: Date.now(), lastEventAt: Date.now(), listingText, packetFileId: opts.packetFileId, reportId: null, address: null, steps: [], progress: null,
     answer: '', report: null, status: 'running', error: null,
   });
   try { sessionStorage.setItem('hc-last-listing', listingText); } catch { /* storage blocked: Retry then needs the start page */ }
@@ -55,6 +56,7 @@ export function startRun(listingText: string, opts: { packetFileId?: string; fai
       let sawDone = false;
       for await (const ev of runCheck({ listingText, packetFileId: opts.packetFileId }, { signal, failStep: opts.failStep })) {
         if (!state || state.seq !== my) return;
+        if (ev.type !== 'error') patch(my, { lastEventAt: Date.now() });
         switch (ev.type) {
           case 'run':
             patch(my, { reportId: ev.reportId, address: ev.address });
