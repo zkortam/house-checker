@@ -276,7 +276,10 @@ export function buildReport(input: RuleInput): Report {
   const active = complaints.filter((x) => /^active/i.test(x.status ?? '')).sort((a, b) => (b.date_filed ?? '').localeCompare(a.date_filed ?? ''));
   const activeNovs = novs.filter((v) => /^active/i.test(v.status ?? '') && !active.some((a) => a.complaint_number === v.complaint_number));
   const caseFee = active.length || activeNovs.length ? 152 : null;
-  for (const a of active) {
+  // A big complex can have dozens of open complaints: the newest 7 as cards, the rest as one summary card.
+  const SHOWN = 7;
+  const activeSorted = [...active].sort((a, b) => (b.date_filed ?? '').localeCompare(a.date_filed ?? ''));
+  for (const a of activeSorted.slice(0, active.length > SHOWN + 1 ? SHOWN : active.length)) {
     const nov = novs.find((v) => v.complaint_number === a.complaint_number);
     const d = lower(a.complaint_description);
     const title = /over[- ]?excavat/.test(d) ? 'Over-excavation at the rear' : /shoring|excavat/.test(d) ? 'Excavation before a shoring permit'
@@ -292,6 +295,13 @@ export function buildReport(input: RuleInput): Report {
       text: `Complaint ${a.complaint_number}, filed ${fmtDate(a.date_filed)}, is active${flags.length ? `, flagged ${flags.join(' and ')}` : ''} ${c(S.complaint(a))}.`,
       stake: `${money(152)} a month in monitoring fees while open ${c(S.dbiFees())}`,
     });
+  }
+  if (active.length > SHOWN + 1) {
+    const rest = activeSorted.slice(SHOWN);
+    const oldest = rest[rest.length - 1];
+    cases.push({ glyph: 'violation', title: `${rest.length} more open complaints`, label: 'open_case',
+      text: `${rest.length} older complaints are also active, the oldest filed ${fmtDate(oldest.date_filed)} ${c(S.complaint(oldest))}. Ask the seller for the full list.`,
+      stake: `${money(152)} a month in monitoring fees while open ${c(S.dbiFees())}` });
   }
   const openPlanning = planning.filter((p) => /ENF/.test(p.record_type ?? p.record_id ?? '') && !/^closed/i.test(p.record_status ?? ''));
   for (const p of openPlanning) {
@@ -595,7 +605,13 @@ export function buildReport(input: RuleInput): Report {
     const groups = new Map<string, CaseRow[]>();
     for (const x of open) { const t = topic(x); if (t) groups.set(t, [...(groups.get(t) ?? []), x]); }
     const grouped = new Set<CaseRow>();
-    for (const [t, xs] of groups) if (xs.length >= 2) { xs.forEach((x) => grouped.add(x)); watch.push(`${cap(word(xs.length))} active complaints about ${t} ${xs.slice(0, 3).map((x) => ref1(x.text)).join('')}`.trim()); }
+    const summary = cases.find((x) => / more open complaints$/.test(x.title));
+    if (summary) { // dozens of complaints: one line with the total
+      const complaintCards = open.filter((x) => x.glyph === 'violation');
+      complaintCards.forEach((x) => grouped.add(x));
+      watch.push(`${active.length} open complaints ${complaintCards.slice(0, 3).map((x) => ref1(x.text)).join('')}`.trim());
+    }
+    for (const [t, xs0] of groups) { const xs = xs0.filter((x) => !grouped.has(x)); if (xs.length < 2) continue; xs.forEach((x) => grouped.add(x)); watch.push(`${cap(word(xs.length))} active complaints about ${t} ${xs.slice(0, 3).map((x) => ref1(x.text)).join('')}`.trim()); }
     // The rest with the same title ("Open complaint" five times) also read as one line.
     const byTitle = new Map<string, CaseRow[]>();
     for (const x of open) if (!grouped.has(x)) byTitle.set(x.title, [...(byTitle.get(x.title) ?? []), x]);
@@ -750,7 +766,7 @@ function ruleAnswer(x: { multiParcel: boolean; unitsNow: number; unitLegalized: 
     return `A legal ${unitsWord} home. The in-law was legalized and signed off in ${year(x.lastUnitPermit.completed_date)} ${x.c(S.permit(x.lastUnitPermit), x.unitCfc ? S.cfc(x.unitCfc) : null)}${stale ? `, so the assessor still showing ${x.unitsNow - 1 === 1 ? 'one unit' : 'fewer units'} and one bath is out of date ${x.c(x.rollSrc)}` : ''}.`;
   }
   if (x.active.length) {
-    return `${A} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}.${x.ledger.some((r) => r.key === 'renovation') ? ' Work is permitted but not signed off.' : ' Ask how it will be closed before you offer.'}`;
+    return `${A} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}.${x.ledger.some((r) => r.key === 'renovation') ? ' Work is permitted but not signed off.' : ` Ask how ${x.active.length > 1 ? 'they' : 'it'} will be closed before you offer.`}`;
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
   if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${problems.map((p) => p.title.toLowerCase()).join(', ')}.`;
@@ -767,8 +783,9 @@ function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: Case
   const hy = year(x.hotelStart);
   add('u-short-term', `City records show a hotel-tax registration at this address${hy ? ` since ${hy}` : ''}. Are any short-term rental bookings scheduled after closing?`);
   if (x.unknowns.some((u) => u.id === 'u-close-cases')) {
-    const nums = x.active.map((c) => c.complaint_number!).filter(Boolean).sort();
-    const list = nums.length > 1 ? `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}` : nums[0];
+    const all = x.active.map((c) => c.complaint_number!).filter(Boolean).sort();
+    const nums = all.length > 4 ? all.slice(-3) : all; // a long list goes as "the 3 newest and N more"
+    const list = all.length > 4 ? `${nums.join(', ')} and ${all.length - 3} more` : nums.length > 1 ? `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}` : nums[0];
     if (nums.length) add('u-close-cases', `What is the status of complaint${nums.length > 1 ? 's' : ''} ${list}? Will ${nums.length > 1 ? 'they' : 'it'} be closed, with fees paid, before closing?`);
     else add('u-close-cases', 'Will the open permits and cases be closed, with fees paid, before closing?');
     // The main job (largest live building permit by cost), then one plumbing and one electrical permit.
