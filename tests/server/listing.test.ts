@@ -109,3 +109,12 @@ describe('address number ranges', () => {
     expect(parseAddress('Built 1900-1910. 57 Carmelita St, SF')?.alts).toBeUndefined();
   });
 });
+
+describe('other cities vs SF streets that share their names', () => {
+  it('keeps SF streets and districts, rejects other cities in city position', async () => {
+    for (const t of ['2400 Sacramento St. 3 bed 2 bath $2M', 'Inner Richmond Edwardian. 600 Clement St, 2 bed 1 bath $1.2M', '2000 San Jose Ave, 2 bed 1 bath $1M', '345 Fremont St #2201, 1 bed $900k'])
+      expect((await readListing(t)).ok).toBe(true);
+    for (const t of ['123 Main St, Oakland CA 94607. 2 bed 1 bath $1M', '123 Main St, Berkeley, CA. 2 bed 1 bath $1M', '12 Elm St, South San Francisco, CA 94080. 2 bed 1 bath $1M'])
+      expect(await readListing(t)).toEqual({ ok: false, kind: 'outside_sf' });
+  });
+});

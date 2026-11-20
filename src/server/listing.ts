@@ -9,6 +9,21 @@ import { llmJson } from './llm';
 
 const OTHER_CITIES = /\b(berkeley|oakland|daly city|south san francisco|san mateo|palo alto|alameda|emeryville|richmond|sausalito|san jose|pacifica|brisbane|millbrae|burlingame|san bruno|marin|mill valley|los angeles|san diego|sacramento|fremont|hayward|walnut creek|redwood city|menlo park|mountain view|sunnyvale|santa clara|colma)\b,?\s*(?:ca|california)?\b/i;
 const SF = /\b(san francisco|\bsf\b)/i;
+const CITY_NAMES = new RegExp(OTHER_CITIES.source.slice(0, OTHER_CITIES.source.indexOf(')\\b') + 3), 'gi'); // names only, no ", CA" tail
+
+/** Another city named in city position ("…, Oakland", "in Berkeley", "Oakland CA 94607"), not a street or district
+ *  that shares its name (Sacramento St, Fremont St, San Jose Ave, Inner Richmond). */
+export function namesOtherCity(text: string): boolean {
+  for (const m of text.matchAll(CITY_NAMES)) {
+    const at = m.index ?? 0;
+    const before = text.slice(Math.max(0, at - 12), at);
+    const after = text.slice(at + m[0].length, at + m[0].length + 16);
+    if (/^\s+(st|street|ave|avenue|blvd|boulevard|way|ter|terrace|pl|place|dr|drive|ct|court|ln|lane|rd|road|aly|alley|cir|plz|hwy)\b/i.test(after)) continue;
+    if (/(inner|outer|central)\s+$/i.test(before)) continue;
+    if (/,\s*$|\bin\s+$/i.test(before) || /^\s*,?\s*(ca|california)\b|^\s*,?\s*9[0-5]\d{3}\b/i.test(after)) return true;
+  }
+  return false;
+}
 
 export type ListingResult = { ok: true; claims: ListingClaims; agentEmail: string | null } | { ok: false; kind: 'invalid' | 'outside_sf' };
 
@@ -89,7 +104,7 @@ const SCHEMA = {
 export async function readListing(text: string): Promise<ListingResult> {
   const clean = (text ?? '').trim();
   if (clean.length < 8) return { ok: false, kind: 'invalid' };
-  if (OTHER_CITIES.test(clean) && !SF.test(clean.replace(/south san francisco/ig, ''))) return { ok: false, kind: 'outside_sf' };
+  if (namesOtherCity(clean) && !SF.test(clean.replace(/south san francisco/ig, ''))) return { ok: false, kind: 'outside_sf' };
   const regex = readListingRegex(clean);
   const agentEmail = clean.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0] ?? null; // no trailing sentence period
   const missing = !regex.address || regex.price == null || (regex.beds == null && regex.baths == null);
@@ -103,7 +118,8 @@ export async function readListing(text: string): Promise<ListingResult> {
     () => ({ ...regex, city: null }),
     { timeoutMs: 45_000, first: true, validate: (v) => appears(v.beds) && appears(v.baths) && appears(v.units) },
   );
-  if (value.city && !/san francisco|^sf$/i.test(value.city)) return { ok: false, kind: 'outside_sf' };
+  // The model's city counts unless it is just the street's name ("2400 Sacramento St" -> city "Sacramento").
+  if (value.city && !/san francisco|^sf$/i.test(value.city) && !(value.address ?? '').toLowerCase().includes(value.city.toLowerCase())) return { ok: false, kind: 'outside_sf' };
   const merged: ListingClaims = {
     address: regex.address ?? (value.address ? parseAddressLoose(value.address)?.display ?? null : null),
     price: regex.price ?? (appears(value.price) ? value.price : null),
