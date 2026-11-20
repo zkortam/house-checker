@@ -87,7 +87,7 @@ export async function readListing(text: string): Promise<ListingResult> {
   const { value } = await llmJson<ListingClaims & { city: string | null }>(SCHEMA,
     `Read this real estate listing and return only what it states. Use null for anything not stated. Do not infer.\n\nListing:\n${clean.slice(0, 6000)}`,
     () => ({ ...regex, city: null }),
-    { timeoutMs: 45_000, validate: (v) => appears(v.beds) && appears(v.baths) && appears(v.units) },
+    { timeoutMs: 45_000, first: true, validate: (v) => appears(v.beds) && appears(v.baths) && appears(v.units) },
   );
   if (value.city && !/san francisco|^sf$/i.test(value.city)) return { ok: false, kind: 'outside_sf' };
   const merged: ListingClaims = {

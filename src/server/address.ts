@@ -18,16 +18,28 @@ const ADDRESS_RE = new RegExp(
 function title(s: string): string {
   s = s.replace(/^0+(\d)/, '$1'); // DataSF writes 06TH; people write 6th
   return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n, o) => n + o.toLowerCase())
-    .replace(/\bO(farrell|shaughnessy|reilly|connor|neil)\b/, (_, r: string) => `O'${r[0].toUpperCase()}${r.slice(1)}`); // DataSF drops the apostrophe
+    .replace(/\bO(farrell|shaughnessy|reilly|connor|neil)\b/, (_, r: string) => `O'${r[0].toUpperCase()}${r.slice(1)}`) // DataSF drops the apostrophe
+    .split(' ').map((w, i, all) => (i > 0 && i < all.length - 1 && /^(Of|The)$/.test(w) ? w.toLowerCase() : w)).join(' '); // Avenue of the Palms
 }
 
 /** Finds the first street address in free text. Never guesses a street type that isn't written. */
+// Streets the city writes without a type (Broadway, Avenue B, The Embarcadero, Avenue of the Palms), only when the
+// name is followed by the city: "1000 Broadway, San Francisco". Listing words never count as a street.
+const TYPELESS_RE = /\b(\d{1,5})([A-Za-z])?\s+((?:[A-Za-z][A-Za-z'.]*)(?:\s+[A-Za-z][A-Za-z'.]*){0,4}?)\s*,?\s*(?:#\s*[A-Za-z0-9-]{1,6}\s*,?\s*)?(?:San Francisco|SF|S\.F\.)\b/i;
+const NOT_STREET = /^(bed|beds|bedroom|bedrooms|bath|baths|bathroom|bathrooms|br|ba|bd|unit|units|sq|sqft|ft|car|cars|story|stories|years?|homes?|condos?|flats?)\b/i;
+
 export function parseAddress(text: string): ParsedAddress | null {
-  const m = text.match(ADDRESS_RE);
-  if (!m) return null;
+  let m: RegExpMatchArray | null = text.match(ADDRESS_RE);
+  if (!m) {
+    const t = text.match(TYPELESS_RE);
+    if (!t || NOT_STREET.test(t[3])) return null;
+    m = Object.assign([t[0], t[1], t[2], t[3], ''], { index: t.index, input: t.input }) as RegExpMatchArray;
+    // The unit (if any) sits between the name and the city; the code below reads it from the text after the street name.
+    m[0] = `${t[1]}${t[2] ?? ''} ${t[3]}`;
+  }
   const [, number, suffix, streetRaw, typeRaw] = m;
   const street = streetRaw.trim().replace(/['’]/g, '').replace(/\s+/g, ' ').toUpperCase(); // DataSF: OFARRELL
-  const type = TYPES[typeRaw.toLowerCase()] ?? null;
+  const type = typeRaw ? TYPES[typeRaw.toLowerCase()] ?? null : null;
   const display = `${number}${suffix ? suffix.toUpperCase() : ''} ${title(street)}${type ? ' ' + TYPE_DISPLAY[type] : ''}`;
   const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
   const unit = after.match(/^\s*,?\s*(?:#|unit\s+|apt\.?\s+|suite\s+|no\.\s*)(\d{1,5}\s?[A-Za-z](?![A-Za-z])|[A-Za-z0-9-]{1,6})\b/i)?.[1]?.toUpperCase().replace(/\s+/g, '') ?? null;
