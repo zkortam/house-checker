@@ -101,3 +101,11 @@ describe('bed and bath phrasing', () => {
     expect(readListingRegex('1 Main St, SF. Studio, 1 bath.')).toMatchObject({ beds: 0, baths: 1 });
   });
 });
+
+describe('address number ranges', () => {
+  it('takes the first number and keeps the second as a fallback', () => {
+    expect(parseAddress('1214-1216 Fell St, San Francisco')).toMatchObject({ number: '1214', alts: ['1216'], display: '1214 Fell St' });
+    expect(parseAddress('1207-09 Fell St, SF')).toMatchObject({ number: '1207', alts: ['1209'] });
+    expect(parseAddress('Built 1900-1910. 57 Carmelita St, SF')?.alts).toBeUndefined();
+  });
+});
