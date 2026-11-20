@@ -180,7 +180,7 @@ function Steps({ steps, progress, startedAt, writing, done, onRetry }: { steps: 
       ) : null}
       {!done ? (
         <p className="steps-foot" aria-live="off">
-          {!running && (progress || writing) ? <><Spinner />{writing ? S.writing : progress}</>
+          {!running && steps.length ? <><Spinner />{writing || !progress ? S.writing : progress}</>
             : elapsed >= LONG_WAIT_SEC ? S.longWait
             : !steps.length ? S.starting
             : fill(S.stepsProgress, { done: steps.filter((x) => x.status !== 'running').length, total: steps.length })}
