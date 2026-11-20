@@ -533,7 +533,7 @@ button.b-card:active { transform: scale(var(--press-subtle)); transition-duratio
 .claim { padding: 13px 12px; margin-inline: -12px; border-radius: 16px; border: 0; background: none; font: inherit; color: inherit; text-align: start; }
 @media (hover: hover) and (pointer: fine) { .claim:hover, .bone:hover { background: var(--bg-overlay); } }
 .claim + .claim { box-shadow: 0 -1px 0 var(--bg-overlay); }
-.claim-t { color: var(--text-muted); }
+.claim-t { color: var(--text-secondary); }
 .claim-v { font-size: calc(18px * var(--font-scale)); font-weight: 600; letter-spacing: -0.02em; text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
 .claim-v.none { font-size: var(--text-sm); font-weight: 400; color: var(--text-secondary); letter-spacing: 0; }
 .claim-ic { display: grid; place-items: center; color: var(--text-faint); }
@@ -651,3 +651,5 @@ button.b-card:active { transform: scale(var(--press-subtle)); transition-duratio
 .start .chip-btn { background: none; color: var(--text-secondary); font-weight: var(--w-medium); }
 @media (hover: hover) and (pointer: fine) { .start .chip-btn:hover { color: var(--text-primary); background: var(--bg-overlay); } }
 .start .btn-fixed { white-space: nowrap; width: auto; min-width: 0; flex: none; padding-inline: var(--sp-5); }
+/* Raised surfaces (sheets, dialogs) sit lighter than the canvas; muted text there needs the secondary ink for 4.5:1. */
+dialog { --text-muted: var(--text-secondary); }
