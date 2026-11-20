@@ -6,6 +6,7 @@ import { Button, ConfirmDialog, Dialog, Input, LinkButton, MetaLine, SlotOption,
 import { book, getSlots, newKey, sendEmail } from '../api';
 import { money, partialDate, slotDayLabel, slotLabel, slotTimeLabel } from '../lib/format';
 import { errorText } from '../lib/errors';
+import { pageOf } from './packet-types';
 
 /* ---------- Source sheet: tap a citation ---------- */
 
@@ -21,7 +22,7 @@ export function SourceSheet({ source, n, onClose }: { source: Source | null; n: 
       {source ? (
         <div className="src-dlg-meta">
           <MetaLine items={[fill(S.sourceN, { n }), source.publisher, source.date ? partialDate(source.date) : null, source.dataset]} />
-          {!source.url ? <p className="row-sub">{S.noLink}</p> : null}
+          {!source.url ? <p className="row-sub">{pageOf(source) ? fill(S.sourcePage, { n: pageOf(source)! }) : S.noLink}</p> : null}
         </div>
       ) : null}
     </Dialog>

@@ -4,11 +4,12 @@ import type { ActionLogEntry, Report, SectionKey, Unknown } from '@contract/type
 import { S } from '../strings.en';
 import { Group, useToast } from '../components/ui';
 import {
-  ActionLog, Ask, Cases, Compare, CostsView, Glance, Hazards, Highlights, History, InfoList, SectionBody, Sources,
+  ActionLog, Ask, Packet, Cases, Compare, CostsView, Glance, Hazards, Highlights, History, InfoList, SectionBody, Sources,
   Systems, sectionId, type AskAction,
 } from './sections';
 import { BookFlow, EmailDialog } from './actions';
 import { track } from '../analytics';
+import { packetOf } from './packet-types';
 
 export function scrollToId(id: string) {
   const el = document.getElementById(id);
@@ -37,6 +38,7 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
   }
 
   const sec = (k: SectionKey) => report.sections[k];
+  const packet = packetOf(report);
   const show = (k: SectionKey, n: number) => sec(k)?.state !== 'ok' || n > 0;
 
   return (
@@ -54,6 +56,12 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
         {show('ledger', report.ledger.length) ? (
           <Group id={sectionId('ledger')} title={S.compareTitle}>
             <SectionBody state={sec('ledger')} onRetry={onRetry}><Compare rows={report.ledger} /></SectionBody>
+          </Group>
+        ) : null}
+
+        {packet || sec('packet')?.state === 'error' ? (
+          <Group id={sectionId('packet')} title={S.packetTitle}>
+            <SectionBody state={sec('packet')} onRetry={onRetry}>{packet && packet.findings.length ? <Packet packet={packet} /> : null}</SectionBody>
           </Group>
         ) : null}
 
@@ -103,9 +111,6 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
           </Group>
         ) : null}
 
-        {sec('packet')?.state === 'error' ? (
-          <Group id={sectionId('packet')} title={S.packetTitle}><SectionBody state={sec('packet')} onRetry={onRetry}>{null}</SectionBody></Group>
-        ) : null}
 
         {log.length ? <Group title={S.actionsTitle}><ActionLog entries={log} /></Group> : null}
 

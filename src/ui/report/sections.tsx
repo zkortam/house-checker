@@ -12,6 +12,7 @@ import { S, fill } from '../strings.en';
 import { G, U } from '../icons';
 import { Button, Card, Cited, Collapse, Group, LabelChip, MetaLine, Pressable, Row, Slider } from '../components/ui';
 import { LOCALE, money, partialDate, plural } from '../lib/format';
+import type { PacketDoc, PacketFinding, PacketSummary } from './packet-types';
 
 export const sectionId = (k: SectionKey) => `sec-${k}`;
 
@@ -402,3 +403,49 @@ export function ActionLog({ entries }: { entries: ActionLogEntry[] }) {
 }
 
 export function stepsSummary(n: number): string { return plural(n, S.stepsDoneOne, S.stepsDone); }
+
+/* ---------- Disclosure packet vs city records ---------- */
+
+const DOC_NAME: Record<PacketDoc, string> = {
+  inspection: S.docInspection, pest: S.docPest, tds: S.docTds, spq: S.docSpq, '3r': S.doc3r,
+  nhd: S.docNhd, title: S.docTitle, hoa: S.docHoa, other: S.docOther,
+};
+
+export function Packet({ packet }: { packet: PacketSummary }) {
+  return (
+    <Card className="cmp-card">
+      <Row lead={<G glyph="packet" />} title={packet.fileName ?? S.packetDefaultName}
+        sub={<MetaLine items={[
+          plural(packet.pages, S.packetPagesOne, S.packetPages),
+          plural(packet.findings.length, S.packetFindingsOne, S.packetFindings),
+        ]} />} />
+      {packet.findings.map((f, i) => <PacketRow key={i} f={f} />)}
+    </Card>
+  );
+}
+
+function PacketRow({ f }: { f: PacketFinding }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const l = LABELS[f.label];
+  return (
+    <div className={`cmp-wrap tone-${l.tone}`}>
+      <Pressable className="row cmp-row" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        <span className="row-body">
+          <span className="cmp-head">
+            <span className="row-title">{DOC_NAME[f.doc] ?? S.docOther}</span>
+            <LabelChip label={f.label} />
+          </span>
+          <span className="pk-page">{fill(S.packetPage, { n: f.page })}</span>
+          <span className="cmp">
+            <span className="cmp-cell"><span className="cmp-k">{S.packetSays}</span><span className="cmp-v pk-v">{f.statement}</span></span>
+            <span className="cmp-ic" aria-label={l.text}><U name={COMPARE_ICON[l.compare]} /></span>
+            <span className="cmp-cell"><span className="cmp-k">{S.compareCity}</span><span className="cmp-v">{f.records ?? EMPTY_VALUE}</span></span>
+          </span>
+          <span className="more">{open ? S.moreHide : S.moreShow}<U name="caret" className="caret" /></span>
+        </span>
+      </Pressable>
+      <Collapse open={open} id={id}><p className="evidence flush"><Cited text={f.text} /></p></Collapse>
+    </div>
+  );
+}

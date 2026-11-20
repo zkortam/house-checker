@@ -20,10 +20,21 @@ export function StartScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
+  const autoRan = useRef(false);
 
   useEffect(() => {
-    try { const d = localStorage.getItem(DRAFT_KEY); if (d) setText(d); } catch { /* no saved draft */ }
     document.title = fill(S.tabTitle, { page: S.startTitle });
+    // A submit before hydration arrives as a plain GET with ?listing=; finish what the reader asked for.
+    const q = new URLSearchParams(location.search).get('listing');
+    if (q && q.trim().length >= 4 && !autoRan.current) {
+      autoRan.current = true;
+      update(q);
+      try { history.replaceState(history.state, '', location.pathname); } catch { /* the query stays visible; harmless */ }
+      void run(q);
+      return;
+    }
+    try { const d = localStorage.getItem(DRAFT_KEY); if (d) setText(d); } catch { /* no saved draft */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function update(v: string) {
@@ -40,8 +51,12 @@ export function StartScreen() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    await run(text);
+  }
+
+  async function run(raw: string) {
     if (busy) return;
-    const t = text.trim();
+    const t = raw.trim();
     if (t.length < 4) { setError(S.errEmpty); field.current?.focus(); return; }
     setError(null);
     setBusy(true);

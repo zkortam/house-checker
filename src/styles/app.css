@@ -441,3 +441,19 @@ dialog.ovl.sm { }
 .switch[aria-checked="true"] .switch-knob { transform: translateX(20px); }
 .switch[aria-checked="true"] .switch-knob { background: var(--on-cta); }
 @media (max-width: 639px) { dialog.ovl .ovl-inner { padding-bottom: calc(var(--spacing-overlay) + var(--sp-2)); } }
+
+/* ---- Long checks: elapsed time, stable two-line step rows, real progress ---- */
+.steps-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); padding-inline-end: var(--card-padding); }
+.elapsed { font-size: var(--text-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.steps .row { min-height: 64px; }
+.step-sub { display: block; }
+.step-bar { display: block; height: 3px; margin-top: 6px; border-radius: var(--radius-full); background: var(--bg-overlay); overflow: hidden; }
+.step-bar > span { display: block; height: 100%; background: var(--text-secondary); transform-origin: 0 50%; transform: scaleX(var(--p)); transition: transform var(--dur-normal) var(--ease-smooth); }
+.progress-line { display: flex; align-items: center; gap: var(--sp-2); }
+.progress-line .spinner .g { width: var(--icon-md); height: var(--icon-md); }
+.long-wait { padding: var(--sp-2) var(--card-padding) var(--sp-3); font-size: var(--text-sm); color: var(--text-secondary); }
+.steps-foot { display: flex; align-items: center; gap: var(--sp-2); min-height: calc(var(--text-sm) * 1.4286 * 2 + var(--sp-5)); padding: var(--sp-2) var(--card-padding) var(--sp-3); font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-secondary); }
+.steps-foot .spinner .g { width: var(--icon-md); height: var(--icon-md); }
+.group > .steps-foot { padding: 0 var(--card-padding) var(--sp-1); min-height: calc(var(--text-sm) * 1.4286 * 2 + var(--sp-1)); align-items: flex-start; }
+.pk-page { font-size: var(--text-sm); color: var(--text-secondary); }
+.pk-v { font-size: var(--text-body); line-height: var(--lh-body); font-weight: var(--w-medium); }

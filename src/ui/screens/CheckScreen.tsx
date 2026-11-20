@@ -83,7 +83,7 @@ export function CheckScreen({ id }: { id: string }) {
 
           {!live && !report && !fetchError ? <div className="loading-line"><Spinner />{S.loadingReport}</div> : null}
 
-          {live ? <Steps steps={live.steps} progress={live.progress} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
+          {live ? <Steps steps={live.steps} progress={live.progress} startedAt={live.startedAt} writing={live.answer.length > 0 && !live.report} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
 
           {live && (live.status === 'failed' || live.status === 'error') && !live.report ? (
             <Card>
@@ -103,7 +103,33 @@ export function CheckScreen({ id }: { id: string }) {
 
 /* ---------- Working view: steps, then one summary line ---------- */
 
-function Steps({ steps, progress, done, onRetry }: { steps: StepEvent[]; progress: string | null; done: boolean; onRetry: () => void }) {
+type StepCount = { done: number; total: number };
+/** Optional real counts on a step (requested as an additive contract field); never parsed out of the detail text. */
+function countOf(s: StepEvent): StepCount | null {
+  const c = (s as StepEvent & { count?: StepCount }).count;
+  return c && c.total > 0 ? c : null;
+}
+
+function useElapsed(startedAt: number, stop: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (stop) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [stop]);
+  return Math.max(0, Math.floor((now - startedAt) / 1000));
+}
+
+function clock(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+const LONG_WAIT_SEC = 12;
+
+function Steps({ steps, progress, startedAt, writing, done, onRetry }: { steps: StepEvent[]; progress: string | null; startedAt: number; writing: boolean; done: boolean; onRetry: () => void }) {
+  const elapsed = useElapsed(startedAt, done);
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   const failed = steps.filter((s) => s.status === 'failed');
@@ -114,7 +140,12 @@ function Steps({ steps, progress, done, onRetry }: { steps: StepEvent[]; progres
       {steps.map((s) => (
         <Row key={s.id} lead={<G glyph={s.glyph} />} title={s.title}
           tone={s.status === 'failed' ? 'error' : undefined}
-          sub={s.status === 'failed' ? (s.reason ?? S.stepFailed) : s.detail}
+          sub={<>
+            <span className="step-sub">{s.status === 'failed' ? (s.reason ?? S.stepFailed) : s.detail ?? (s.status === 'running' ? S.stepWaiting : S.stepDone)}</span>
+            {s.status === 'running' && countOf(s) ? (
+              <span className="step-bar" aria-hidden="true"><span style={{ ['--p' as string]: Math.min(1, countOf(s)!.done / countOf(s)!.total) }} /></span>
+            ) : null}
+          </>}
           end={
             <span className="step-end">
               {s.status === 'failed' && s.retryable ? <Button kind="text" size="sm" onClick={onRetry}>{S.retry}</Button> : null}
@@ -126,12 +157,26 @@ function Steps({ steps, progress, done, onRetry }: { steps: StepEvent[]; progres
             </span>
           } />
       ))}
-      {!running && progress ? <p className="progress-line">{progress}</p> : null}
-      {!steps.length ? <div className="loading-line pad"><Spinner />{S.starting}</div> : null}
+      {!steps.length ? <div className="loading-line pad"><Spinner /></div> : null}
     </div>
   );
   return (
-    <Group title={done ? undefined : S.stepsTitle}>
+    <Group>
+      {!done ? (
+        <div className="steps-head">
+          <h2 className="section-label">{S.stepsTitle}</h2>
+          <span className="elapsed num" aria-hidden="true">{fill(S.elapsed, { time: clock(elapsed) })}</span>
+        </div>
+      ) : null}
+      {!done ? (
+        <p className="steps-foot" aria-live="off">
+          {!running && (progress || writing) ? <><Spinner />{writing ? S.writing : progress}</>
+            : elapsed >= LONG_WAIT_SEC ? S.longWait
+            : !steps.length ? S.starting
+            : fill(S.stepsProgress, { done: steps.filter((x) => x.status !== 'running').length, total: steps.length })}
+        </p>
+      ) : null}
+
       {done ? (
         <Card>
           <Row onClick={() => setExpanded(!expanded)} expanded={!collapsed} controls={id}
