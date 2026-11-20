@@ -56,7 +56,7 @@ export async function writeProse(report: Report): Promise<Report> {
   const sources = report.sources.length;
   const { value, source } = await llmJson<{ answer: string; inspection: string }>(SCHEMA, prompt,
     () => ({ answer: report.answer, inspection: report.decision.inspection }),
-    { timeoutMs: 60_000, retries: 1, validate: (v) => acceptable(v.answer, evidence, sources, 220) && acceptable(v.inspection, evidence, sources, 240) });
+    { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, validate: (v) => acceptable(v.answer, evidence, sources, 220) && acceptable(v.inspection, evidence, sources, 240) });
   if (source === 'fallback') return report;
   return { ...report, answer: value.answer.trim(), decision: { ...report.decision, inspection: value.inspection.trim() } };
 }

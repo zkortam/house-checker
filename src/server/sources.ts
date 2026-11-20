@@ -47,6 +47,16 @@ const blockLotWhere = (a: ResolvedAddress, b = 'block', l = 'lot') => {
   for (const p of a.parcels) byBlock.set(p.block, [...(byBlock.get(p.block) ?? []), p.lot]);
   return [...byBlock.entries()].map(([bk, lots]) => `(${b}=${q(bk)} AND ${l} in ${inList(lots)})`).join(' OR ');
 };
+/**
+ * Large buildings (condos, hundreds of parcels): the unit's own parcel plus anything filed under the building's
+ * street address, instead of every parcel. Single-parcel homes keep the plain block/lot query.
+ */
+const unitOrBuilding = (a: ResolvedAddress, numField = 'street_number', nameField = 'street_name') => {
+  if (a.parcels.length <= 1) return blockLotWhere(a);
+  const p = a.parcels[0];
+  const name = a.streetName.replace(/^0+(\d)/, '$1');
+  return `(block=${q(p.block)} AND lot=${q(p.lot)}) OR (${numField}=${q(String(Number(a.input.number)))} AND upper(${nameField})=${q(name)})`;
+};
 const parcelIn = (a: ResolvedAddress, f = 'parcel_number') => `${f} in ${inList(a.parcels.map((p) => p.parcel))}`;
 const point = (a: ResolvedAddress) => `POINT(${a.lon} ${a.lat})`;
 const hits = (rows: Row[]) => rows.length > 0;
@@ -69,8 +79,8 @@ export const fetchers = {
 
   async permits(a: ResolvedAddress): Promise<Pick<Raw, 'permits' | 'permitsf' | 'cfc' | 'housing'>> {
     const [permitsRaw, permitsf, housing] = await Promise.all([
-      soql('i98e-djp9', { where: blockLotWhere(a), order: 'filed_date DESC', limit: 5000 }, { label: 'permits' }),
-      soql('tyz3-vt28', { where: parcelIn(a), limit: 1000 }, { label: 'permits' }).catch(() => [] as Row[]),
+      soql('i98e-djp9', { where: unitOrBuilding(a), order: 'filed_date DESC', limit: 5000 }, { label: 'permits' }),
+      soql('tyz3-vt28', { where: a.parcels.length > 1 ? `parcel_number=${q(a.parcels[0].parcel)}` : parcelIn(a), limit: 1000 }, { label: 'permits' }).catch(() => [] as Row[]),
       soql('xdht-4php', { where: `blocklot in ${inList(a.parcels.map((p) => p.parcel))}`, limit: 200 }, { label: 'permits' }).catch(() => [] as Row[]),
     ]);
     const permits = dedupe(permitsRaw as Row[], 'permit_number');
@@ -83,17 +93,17 @@ export const fetchers = {
 
   async trade(a: ResolvedAddress): Promise<Pick<Raw, 'plumbing' | 'electrical' | 'plumbingInspections'>> {
     const [plumbing, electrical, plumbingInspections] = await Promise.all([
-      soql('a6aw-rudh', { where: blockLotWhere(a), limit: 2000 }, { label: 'trade_permits' }),
-      soql('ftty-kx6y', { where: blockLotWhere(a), limit: 2000 }, { label: 'trade_permits' }),
-      soql('fuas-yurr', { where: blockLotWhere(a), limit: 2000 }, { label: 'trade_permits' }).catch(() => [] as Row[]),
+      soql('a6aw-rudh', { where: unitOrBuilding(a), limit: 2000 }, { label: 'trade_permits' }),
+      soql('ftty-kx6y', { where: unitOrBuilding(a), limit: 2000 }, { label: 'trade_permits' }),
+      soql('fuas-yurr', { where: unitOrBuilding(a, 'street_number', 'avs_street_name'), limit: 2000 }, { label: 'trade_permits' }).catch(() => [] as Row[]),
     ]);
     return { plumbing: dedupe(plumbing as Row[], 'permit_number'), electrical: dedupe(electrical as Row[], 'permit_number'), plumbingInspections: plumbingInspections as Row[] };
   },
 
   async complaints(a: ResolvedAddress): Promise<Pick<Raw, 'complaints' | 'novs'>> {
     const [complaints, novs] = await Promise.all([
-      soql('gm2e-bten', { where: blockLotWhere(a), order: 'date_filed DESC', limit: 2000 }, { label: 'complaints' }),
-      soql('nbtm-fbw5', { where: blockLotWhere(a), limit: 5000 }, { label: 'complaints' }),
+      soql('gm2e-bten', { where: unitOrBuilding(a), order: 'date_filed DESC', limit: 2000 }, { label: 'complaints' }),
+      soql('nbtm-fbw5', { where: unitOrBuilding(a), limit: 5000 }, { label: 'complaints' }),
     ]);
     return { complaints: dedupe(complaints as Row[], 'complaint_number'), novs: novs as Row[] };
   },
