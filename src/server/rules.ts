@@ -441,6 +441,7 @@ export function buildReport(input: RuleInput): Report {
   const nearby: InfoRow[] = [];
   for (const p of (raw.nearbyProjects ?? [])
     .filter((p) => p.demolition === 'CHECKED' || p.new_construction === 'CHECKED' || Math.abs(n(p.number_of_units_net) ?? 0) >= 1)
+    .filter((p) => !/cancel|withdraw|disapprov|expired/i.test(p.record_status ?? ''))
     .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? '')).slice(0, 4)) {
     const units = n(p.number_of_units_prop);
     const d = lower(p.description);
@@ -448,9 +449,12 @@ export function buildReport(input: RuleInput): Report {
     const storiesN = stories ? (WORDNUM[stories] ?? (stories === 'three' ? 3 : Number(stories))) : null;
     const what = p.demolition === 'CHECKED' && p.new_construction === 'CHECKED'
       ? `Full demolition and a new ${storiesN ? storiesN + '-story, ' : ''}${units ? units + '-unit ' : ''}building`
-      : p.new_construction === 'CHECKED' ? `A new ${units ? units + '-unit ' : ''}building` : p.adu === 'CHECKED' ? 'A new in-law unit' : `A change of ${n(p.number_of_units_net)} unit${Math.abs(n(p.number_of_units_net) ?? 0) === 1 ? '' : 's'}`;
+      : p.new_construction === 'CHECKED' ? `A new ${units ? units + '-unit ' : ''}building` : p.adu === 'CHECKED' ? 'A new in-law unit'
+      : (n(p.number_of_units_net) ?? 0) > 0 ? `${cap(word(n(p.number_of_units_net)!))} unit${n(p.number_of_units_net) === 1 ? '' : 's'} added` : `${cap(word(Math.abs(n(p.number_of_units_net)!)))} unit${n(p.number_of_units_net) === -1 ? '' : 's'} removed`;
+    const st = lower(p.record_status);
+    const status = st.startsWith('submit') ? 'submitted' : /approv/.test(st) ? 'approved, filed' : /review|open|pending|accepted/.test(st) ? 'under review, filed' : /complete|closed/.test(st) ? 'closed, filed' : 'filed';
     nearby.push({ glyph: 'nearby', title: titleCase((p.project_address ?? p.project_name ?? '').replace(/\s+\d{5}$/, '')),
-      text: `${what}. Project ${p.record_id} was ${lower(p.record_status).startsWith('submit') ? 'submitted' : lower(p.record_status)} ${fmtDate(p.open_date)}, within 150 m ${c(S.planning(p))}.` });
+      text: `${what}. Project ${p.record_id} was ${status} ${fmtDate(p.open_date)}, within 150 m ${c(S.planning(p))}.` });
   }
 
   const street = (raw.streetPermits ?? []).filter((p) => /street space/i.test(p.permit_type ?? 'street space'));
@@ -547,7 +551,8 @@ export function buildReport(input: RuleInput): Report {
   for (const b of buyouts.slice(0, 1)) watch.push(`Tenant buyout in ${year(b.buyout_agreement_date)}: ${money(n(b.buyout_amount) ?? 0)} to ${n(b.number_of_tenants) ?? ''} tenants ${c(S.buyout(b, addr.display, addrUpper))}`);
   if (hotel.length) watch.push(`Hotel-tax registration since ${year(hotelStart)}, a sign of short-term rentals ${c(hotelSrc)}`);
   for (const h of notes) watch.push(h.key === 'reservoir' ? `Inside the ${hz?.reservoirs?.length === 2 && hz.reservoirs.every((r) => /^Sunset/.test(r)) ? 'Sunset' : (hz?.reservoirs ?? []).join(' and ')} reservoirs failure zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
-    : `${h.title}: ${h.text.split(/(?<=\])/)[0]}`);
+    : h.key === 'landslide' ? (hz?.landslideZone ? `Inside a state landslide zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `Landslide susceptibility class ${hz?.landslideClass} of 10 ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim())
+    : `${({ flood: 'Inside a FEMA flood zone', storm_flood: 'Inside the 100-year storm flood zone', liquefaction: 'Inside a state liquefaction zone', tsunami: 'Inside the tsunami hazard area', sea_level: 'Inside the sea level rise maps', soil: 'Inside the Maher soil testing area' } as Record<string, string>)[h.key] ?? h.title} ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   if (nearby.length) {
     const first = nearby[0].text;
     watch.push(/demolition/i.test(first) ? `A demolition and new ${first.match(/(\d+)-unit/)?.[1] ?? ''}-unit building planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.replace('new -unit', 'new') : `${nearby[0].title}: project planned nearby ${first.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
@@ -648,7 +653,7 @@ function ruleAnswer(x: { unitsNow: number; unitLegalized: boolean; lastUnitPermi
     return `A legal ${unitsWord} home. The in-law was legalized and signed off in ${year(x.lastUnitPermit.completed_date)} ${x.c(S.permit(x.lastUnitPermit), x.unitCfc ? S.cfc(x.unitCfc) : null)}${stale ? `, so the assessor still showing ${x.unitsNow - 1 === 1 ? 'one unit' : 'fewer units'} and one bath is out of date ${x.c(x.rollSrc)}` : ''}.`;
   }
   if (x.active.length) {
-    return `A ${unitsWord} home with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}. Work is permitted but not signed off.`;
+    return `A ${unitsWord} home with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}.${x.ledger.some((r) => r.key === 'renovation') ? ' Work is permitted but not signed off.' : ' Ask how it will be closed before you offer.'}`;
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
   if (problems.length) return `A ${unitsWord} home. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${problems.map((p) => p.title.toLowerCase()).join(', ')}.`;
