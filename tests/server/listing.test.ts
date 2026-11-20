@@ -135,3 +135,10 @@ describe('price in a pasted listing page', () => {
     expect(readListingRegex('Zestimate: $1,402,300. 1214 Fell St SF. $1,295,000').price).toBe(1295000);
   });
 });
+
+describe('Redfin layout', () => {
+  it('reads counts on their own line', () => {
+    const page = '1214 Fell St, San Francisco, CA 94117\nRedfin Estimate $1,380,000\n$1,295,000\nPrice\n3\nBeds\n2.5\nBaths\n1,520\nSq Ft\nLot Size: 2,495 Sq. Ft.';
+    expect(readListingRegex(page)).toMatchObject({ price: 1295000, beds: 3, baths: 2.5, sqft: 1520 });
+  });
+});

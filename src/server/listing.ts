@@ -58,9 +58,9 @@ export function readListingRegex(text: string): ListingClaims {
   const N = '(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight)';
   const WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
   const count = (v: string) => (/^\d/.test(v) ? v : String(WORDS[v.toLowerCase()]));
-  const bedM = t.match(new RegExp(`\\b${N}[- ]?(?:bed(?:room)?s?|br|bd)\\b`, 'i'));
+  const bedM = t.match(new RegExp(`\\b${N}(?:-|\\s{1,3})?(?:bed(?:room)?s?|br|bd)\\b`, 'i'));
   const beds = bedM ? [bedM[0], count(bedM[1])] : /\bstudio\b/i.test(t) ? [ 'studio', '0'] : null;
-  const bathM = t.match(new RegExp(`\\b${N}[- ]?(?:full\\s+)?(?:bath(?:room)?s?|ba)\\b`, 'i'));
+  const bathM = t.match(new RegExp(`\\b${N}(?:-|\\s{1,3})?(?:full\\s+)?(?:bath(?:room)?s?|ba)\\b`, 'i'));
   const halfM = t.match(new RegExp(`\\b(one|a|1|two|2)\\s+half[- ]?bath(?:room)?s?\\b`, 'i'));
   const baths = bathM ? [bathM[0], String(Number(count(bathM[1])) + (halfM && !/\./.test(bathM[1]) && halfM.index! > bathM.index! ? (/^(two|2)$/i.test(halfM[1]) ? 1 : 0.5) : 0))] : null;
   // Living area, not the lot: skip a match with "lot" just before it or right after it.
