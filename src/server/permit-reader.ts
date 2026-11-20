@@ -92,7 +92,9 @@ export async function readPermits(permits: Row[], onProgress?: (done: number, to
   const save = async () => { try { await mkdir(path.dirname(file()), { recursive: true }); await writeFile(file(), JSON.stringify(known)); } catch { /* best effort */ } };
   // Batches that finish after the budget still land in the cache, so the next check of this building is instant.
   void work.then(save, () => undefined);
-  await Promise.race([work, new Promise((r) => setTimeout(r, budgetMs + 500))]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([work, new Promise((r) => { timer = setTimeout(r, budgetMs + 500); })]);
+  clearTimeout(timer);
   const result = new Map(out);
   for (const p of permits) if (p.permit_number && !result.has(p.permit_number)) result.set(p.permit_number, regexFacts(p));
   return result;

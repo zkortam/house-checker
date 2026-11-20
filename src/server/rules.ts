@@ -383,7 +383,7 @@ export function buildReport(input: RuleInput): Report {
     const amt = n(b.buyout_amount);
     const t = n(b.number_of_tenants);
     tenants.push({ glyph: 'tenants', title: `Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}`,
-      text: `Buyout ${b.case_number}, filed ${fmtDate(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}: ${amt ? money(amt) + ' paid' : 'paid'} to ${t ?? 'the'} tenant${t === 1 ? '' : 's'} to leave ${c(S.buyout(b, addr.display, addrUpper))}. A past buyout can limit converting the units to condos later. Ask the Rent Board how it applies.` });
+      text: `Buyout ${b.case_number}, filed ${fmtDate(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}: ${amt ? money(amt) + ' paid' : 'paid'} to ${t ?? 'the'} tenant${t === 1 ? '' : 's'} to leave ${c(S.buyout(b, addr.display, addrUpper))}. ${multiParcel ? 'This was filed for the building. Ask the Rent Board whether it involved this unit.' : 'A past buyout can limit converting the units to condos later. Ask the Rent Board how it applies.'}` });
   }
   const hotelStart = hotel.map((h) => h.location_start_date).filter(Boolean).sort()[0] ?? null;
   const hotelSrc = hotel.length ? S.hotelTax(slug, addr.display, day(hotelStart) || null) : null;
@@ -575,7 +575,11 @@ export function buildReport(input: RuleInput): Report {
   for (const x of cases) watch.push(x.label === 'likely_stale' ? `Planning case still reads ${lower(openPlanning[0]?.record_status)} ${x.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `${x.title} ${x.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   if (aduRow?.label === 'no_permit_found') watch.push(`No permit for the in-law unit ${aduRow.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   for (const r of ledger.filter((r) => r.label === 'permitted_not_finaled')) watch.push(`${r.title} permitted, not signed off ${r.why.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
-  for (const b of buyouts.slice(0, 1)) watch.push(`Tenant buyout in ${year(b.buyout_agreement_date)}: ${money(n(b.buyout_amount) ?? 0)} to ${n(b.number_of_tenants) ?? ''} tenants ${c(S.buyout(b, addr.display, addrUpper))}`);
+  for (const b of buyouts.slice(0, 1)) {
+    const amt = n(b.buyout_amount); const t = n(b.number_of_tenants);
+    const who = t ? `${t} tenant${t === 1 ? '' : 's'}` : 'tenants';
+    watch.push(`Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}${multiParcel ? ' in the building' : ''}: ${amt ? money(amt) : 'paid'} to ${who} ${c(S.buyout(b, addr.display, addrUpper))}`);
+  }
   if (hotel.length) watch.push(`Hotel-tax registration since ${year(hotelStart)}, a sign of short-term rentals ${c(hotelSrc)}`);
   for (const h of notes) watch.push(h.key === 'reservoir' ? `Inside the ${hz?.reservoirs?.length === 2 && hz.reservoirs.every((r) => /^Sunset/.test(r)) ? 'Sunset' : (hz?.reservoirs ?? []).join(' and ')} reservoirs failure zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
     : h.key === 'landslide' ? (hz?.landslideZone ? `Inside a state landslide zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `Landslide susceptibility class ${hz?.landslideClass} of 10 ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim())
@@ -609,7 +613,7 @@ export function buildReport(input: RuleInput): Report {
     }
   }
   for (const a of active) { const ref = cited(`complaint:${a.complaint_number}`); if (ref) history.push({ date: day(a.date_filed), kind: 'complaint', text: `Complaint: ${lower(cases.find((x) => x.text.includes(a.complaint_number!))?.title ?? 'open complaint')} ${ref}` }); }
-  for (const b of buyouts) { const ref = cited(`buyout:${b.case_number}`); if (ref) history.push({ date: day(b.buyout_agreement_date), kind: 'tenant', text: `Tenant buyout, ${n(b.number_of_tenants) ?? ''} tenants ${ref}`.replace(',  tenants', '') }); }
+  for (const b of buyouts) { const ref = cited(`buyout:${b.case_number}`); if (ref) history.push({ date: day(b.buyout_agreement_date), kind: 'tenant', text: (() => { const t = n(b.number_of_tenants); return `Tenant buyout${t ? `, ${t} tenant${t === 1 ? '' : 's'}` : ''} ${ref}`; })() }); }
   if (roll?.current_sales_date && rollSrc) history.push({ date: roll.current_sales_date.slice(0, 7), kind: 'sale', text: `Current owner bought the house ${c(rollSrc)}` });
   for (const p of openPlanning) { const ref = cited(`planning:${p.record_id}`); if (ref) history.push({ date: day(p.open_date), kind: 'planning', text: `Planning opens case ${p.record_id} ${ref}` }); }
   if (hotelSrc && hotelStart) history.push({ date: day(hotelStart), kind: 'other', text: `Hotel-tax registration starts ${c(hotelSrc)}` });
