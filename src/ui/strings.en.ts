@@ -81,6 +81,7 @@ export const S = {
   interrupted: 'The check stopped when the page reloaded. Retry to run it again.',
   runFailed: "The check stopped before it finished. Retry to run it again.",
   loadingReport: 'Loading the report',
+  stillChecking: 'Still checking city records. This can take up to a minute.',
 
   // Errors by ApiError kind
   errInvalid: 'Enter a street address in San Francisco',

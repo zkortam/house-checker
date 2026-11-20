@@ -27,6 +27,8 @@ export function CheckScreen({ id }: { id: string }) {
   const [fetchError, setFetchError] = useState<ApiError | null>(null);
   const [src, setSrc] = useState<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [slowLoad, setSlowLoad] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSlowLoad(true), 2500); return () => clearTimeout(t); }, [id]);
 
   // A refresh or a shared link: restore the stored report.
   useEffect(() => {
@@ -91,7 +93,7 @@ export function CheckScreen({ id }: { id: string }) {
             </Card>
           ) : null}
 
-          {!live && !report && !fetchError ? <div className="loading-line"><Spinner />{S.loadingReport}</div> : null}
+          {!live && !report && !fetchError ? <div className="loading-line"><Spinner />{slowLoad && lastRunId() === id ? S.stillChecking : S.loadingReport}</div> : null}
 
           {live ? <Steps steps={live.steps} progress={live.progress} startedAt={live.startedAt} lastEventAt={live.lastEventAt} writing={live.answer.length > 0 && !live.report} done={live.status === 'done' || !!live.report} onRetry={retry} /> : null}
 
