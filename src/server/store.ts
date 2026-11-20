@@ -11,18 +11,23 @@ import type { ActionLogEntry, Report } from '../contract/types';
  */
 const blobOn = () => !!process.env.BLOB_READ_WRITE_TOKEN;
 const blobPath = (id: string) => `reports/${safe(id)}.json`;
-async function blobRead(id: string): Promise<Report | null> {
+/** Shared JSON in the private Blob store (no-op without BLOB_READ_WRITE_TOKEN). */
+export async function blobGetJson<T>(pathname: string): Promise<T | null> {
+  if (!blobOn()) return null;
   try {
-    const r = await blobGet(blobPath(id), { access: 'private', useCache: false });
+    const r = await blobGet(pathname, { access: 'private', useCache: false });
     if (!r || r.statusCode !== 200) return null;
-    return JSON.parse(await new Response(r.stream).text()) as Report;
+    return JSON.parse(await new Response(r.stream).text()) as T;
   } catch { return null; }
 }
-async function blobWrite(report: Report): Promise<void> {
-  await blobPut(blobPath(report.id), JSON.stringify(report), {
+export async function blobPutJson(pathname: string, value: unknown): Promise<void> {
+  if (!blobOn()) return;
+  await blobPut(pathname, JSON.stringify(value), {
     access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json', cacheControlMaxAge: 60,
   });
 }
+const blobRead = (id: string) => blobGetJson<Report>(blobPath(id));
+const blobWrite = (report: Report) => blobPutJson(blobPath(report.id), report);
 
 /** Where JSON state lives. On Vercel the app directory is read-only, so the default there is the temp dir. */
 export function dataDir(): string {

@@ -11,6 +11,7 @@ import { errorText } from '../lib/errors';
 import { partialDate } from '../lib/format';
 import { ReportView } from '../report/ReportView';
 import { Verdict, stepsSummary } from '../report/sections';
+import { Hero } from '../report/ReportView';
 import { SourceSheet } from '../report/actions';
 import { AppShell } from '../components/AppShell';
 import { track } from '../analytics';
@@ -69,17 +70,10 @@ export function CheckScreen({ id }: { id: string }) {
   return (
     <AppShell back title={address ?? undefined} share={!!report}>
       <SourceProvider value={openSource}>
-        <section className="column" aria-labelledby="reportTitle">
-          <div className="answer-head">
+        <section className={`column${report ? ' wide' : ''}`} aria-labelledby="reportTitle">
+          {report ? null : <div className="answer-head">
             <h1 id="reportTitle">{address ?? (fetchError ? S.appName : S.stepsTitle)}</h1>
-            {report ? (
-              <MetaLine items={[
-                fill(S.parcel, { value: report.parcelDisplay }), report.meta.neighborhood, report.meta.zoning,
-                report.meta.yearBuilt ? fill(S.built, { value: report.meta.yearBuilt }) : null,
-                fill(S.checkedOn, { value: partialDate(report.checkedAt.slice(0, 10)) }),
-              ]} />
-            ) : null}
-          </div>
+          </div>}
 
           {fetchError && !live ? (
             <Card>
@@ -104,8 +98,9 @@ export function CheckScreen({ id }: { id: string }) {
             </Card>
           ) : null}
 
-          {showVerdict ? <Verdict report={report} answer={answer} streaming={streaming && !report} /> : null}
+          {showVerdict && !report ? <Verdict report={report} answer={answer} streaming={streaming && !report} /> : null}
         </section>
+        {report ? <div className="rv-hero-wrap"><Hero report={report} answer={answer} /></div> : null}
         {report ? <ReportView key={report.id + report.createdAt} report={report} onRetry={retry} openSource={openSource} /> : null}
         <SourceSheet source={src != null && report ? report.sources[src - 1] ?? null : null} n={src ?? 0} onClose={() => setSrc(null)} />
       </SourceProvider>
