@@ -81,7 +81,7 @@ export const report2055: Report = {
     { key: 'baths', title: 'Baths', listing: '4', records: '4', label: 'permitted_not_updated',
       why: 'Two plumbing permits passed final inspection on Apr 30, 2025: two baths in the ADU and two new baths upstairs [3][5]. The assessor still records 1 bath [1].' },
     { key: 'sqft', title: 'Sq ft', listing: '2,000', records: '2,006', label: 'matches_planning',
-      why: "Planning approved the ADU project at 2,006 sq ft of floor area, up from 1,216 [7]. The assessor's 1,300 predates the work [1]." },
+      why: "Planning approved the ADU project at 2,006 sq ft of floor area, up from 1,216 [22]. The assessor's 1,300 predates the work [1]." },
     { key: 'adu', title: 'In-law', listing: 'Legal', records: 'Legal 2025', label: 'resolved',
       why: 'Complaints in 2014, 2017 and 2018 cited an illegal unit with no windows or ventilation in the bedroom [6]. The 2023 permit was filed to comply with both notices of violation and is complete [2].' },
     { key: 'beds', title: 'Bedrooms', listing: '3', records: null, label: 'not_settled',
@@ -162,6 +162,7 @@ export const report2055: Report = {
     { id: 'stormflood:2162008', title: '100-year storm flood risk zone', publisher: 'SFPUC', date: '2022-07', url: D + 'jzu3-4yxp', dataset: 'jzu3-4yxp' },
     { id: 'sealevel:2162008', title: 'Sea level rise maps, 24 and 66 inches', publisher: 'SF Planning', date: '2020', url: D + 'esku-ejgv', dataset: 'esku-ejgv' },
     { id: 'maher:2162008', title: 'Maher soil and groundwater ordinance area', publisher: 'SF Public Health', date: null, url: D + 'v5ic-hjgw', dataset: 'v5ic-hjgw' },
+    { id: 'planning:2023-000254PRJ', title: 'Planning project 2023-000254PRJ, ADU', publisher: 'SF Planning', date: '2023-11-16', url: R + 'qvu5-m3a2.json?record_id=2023-000254PRJ', dataset: 'qvu5-m3a2' },
   ],
   actions: [],
   drafts: {
