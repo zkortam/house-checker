@@ -12,11 +12,12 @@ const entryId = () => `act-${randomBytes(4).toString('hex')}`;
 
 export async function emailAction(req: Partial<EmailSendRequest>): Promise<ActionResult> {
   if (!req || !req.reportId || !req.idempotencyKey || !req.subject || !req.body || !req.kind) return err('invalid', { debug: 'missing fields' });
-  if (!req.to || !EMAIL_RE.test(req.to.trim())) return err('invalid', { field: 'to' });
+  const to = typeof req.to === 'string' ? req.to.trim().replace(/[.,;]+$/, '') : ''; // "agent@example.com." pasted from a sentence
+  if (!to || !EMAIL_RE.test(to)) return err('invalid', { field: 'to' });
   if (req.kind !== 'email_listing_agent' && req.kind !== 'email_city') return err('invalid', { debug: 'bad kind' });
   const report = await getReport(req.reportId);
   if (!report) return err('not_found');
-  const r = req as EmailSendRequest;
+  const r = { ...req, to } as EmailSendRequest;
   return idempotent<ActionResult>('email', `${r.reportId}__${r.idempotencyKey}`, async () => {
     const sent = await sendEmail({
       to: [r.to.trim()], subject: r.subject.slice(0, 200), text: r.body.slice(0, 10_000), idempotencyKey: r.idempotencyKey,

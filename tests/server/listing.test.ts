@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readListingRegex } from '../../src/server/listing';
+import { readListing, readListingRegex } from '../../src/server/listing';
 import { parseAddress } from '../../src/server/address';
 
 const SAMPLES: Array<[string, Partial<ReturnType<typeof readListingRegex>>]> = [
@@ -54,5 +54,19 @@ describe('prices without a dollar sign', () => {
     const { readListingRegex: regexListing } = await import('../../src/server/listing');
     expect(regexListing('450 Vallejo St sf, 1br/1ba condo asking 799k').price).toBe(799000);
     expect(regexListing('1 Main St, SF. 2 bed, asking 1.2M').price).toBe(1200000);
+  });
+});
+
+describe('agent email', () => {
+  it('drops the sentence period after an address', async () => {
+    const r = await readListing('Example listing: 57 Carmelita St, San Francisco. 3 bed, 3 bath. Agent: agent@example.com. Offered at $3,295,000.');
+    expect(r.ok && r.agentEmail).toBe('agent@example.com');
+  });
+});
+
+describe('street spellings', () => {
+  it("drops apostrophes so O'Farrell matches the city's OFARRELL, and shows it with one", () => {
+    expect(parseAddress("631 O'Farrell St, San Francisco")).toMatchObject({ street: 'OFARRELL', display: "631 O'Farrell St" });
+    expect(parseAddress('213 06th Ave, San Francisco')?.display).toBe('213 6th Ave');
   });
 });

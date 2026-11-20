@@ -70,7 +70,7 @@ export async function writeProse(report: Report): Promise<Report> {
   }
   const { value, source } = await llmJson<{ answer: string; inspection: string }>(SCHEMA, prompt,
     () => ({ answer: report.answer, inspection: report.decision.inspection }),
-    { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, validate: (v) => acceptable(v.answer, evidence, sources, 220) && acceptable(v.inspection, evidence, sources, 240) });
+    { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, first: true, maxWaitMs: 10_000, validate: (v) => acceptable(v.answer, evidence, sources, 220) && acceptable(v.inspection, evidence, sources, 240) });
   if (source === 'fallback') return report;
   try { await mkdir(path.dirname(cacheFile), { recursive: true }); await writeFile(cacheFile, JSON.stringify({ answer: value.answer.trim(), inspection: value.inspection.trim() })); } catch { /* best effort */ }
   return { ...report, answer: value.answer.trim(), decision: { ...report.decision, inspection: value.inspection.trim() } };
