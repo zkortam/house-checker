@@ -96,13 +96,13 @@ export function ReportView({ report, onRetry, openSource }: { report: Report; on
 
         <footer className="rv-foot">
           <div className="pills">
-            <button type="button" className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
+            <Pressable className="pill" onClick={() => open(S.sourcesTitle, <Sources sources={report.sources} onOpen={(n, el) => { setSheet(null); openSource(n, el); }} />)}>
               {fill(S.sourcesN, { n: report.sources.length })}
-            </button>
+            </Pressable>
             {log.length ? (
-              <button type="button" className="pill" onClick={() => open(S.actionsTitle, <ActionLog entries={log} />)}>
+              <Pressable className="pill" onClick={() => open(S.actionsTitle, <ActionLog entries={log} />)}>
                 {fill(S.sentN, { n: log.length })}
-              </button>
+              </Pressable>
             ) : null}
           </div>
           <p className="fineprint">{report.answerBy === 'rules' ? S.writtenByRules : S.writtenByAi}. {S.disclaimer}</p>
@@ -214,7 +214,7 @@ function TaxCard({ costs, price, setPrice, onHow }: { costs: Costs; price: numbe
         <Slider id="hc-price" min={min} max={max} step={5000} value={price} onChange={setPrice} label={S.priceLabel} />
         <span className="tax-price num">{money(price)}</span>
       </div>
-      <button type="button" className="b-link" onClick={onHow}>{S.howWorkedOut}<U name="caret" className="rot" /></button>
+      <Pressable className="b-link" onClick={onHow}>{S.howWorkedOut}<U name="caret" className="rot" /></Pressable>
     </div>
   );
 }
@@ -274,9 +274,9 @@ function AskRow({ unknowns, log, onAction, onOpen }: {
             <div key={g.key} className="ask-card">
               <span className="ask-who">{g.title}</span>
               <span className="ask-q">{g.items[0].title}</span>
-              <button type="button" className="b-link" onClick={() => onOpen(g.title, g.items, button)}>
+              <Pressable className="b-link" onClick={() => onOpen(g.title, g.items, button)}>
                 {plural(g.items.length, S.questionsOne, S.questions)}<U name="caret" className="rot" />
-              </button>
+              </Pressable>
               <div className="ask-btn">{button}</div>
             </div>
           );
@@ -328,7 +328,7 @@ function BonesCard({ rows, built, onOpen }: { rows: SystemRow[]; built: number |
             <Pressable key={i} className={`bone tone-${st.tone}`} onClick={() => onOpen(r)} aria-label={`${r.title}: ${r.year ?? st.text}`}>
               <span className="bone-t">{r.title}</span>
               <span className="bone-track" aria-hidden="true">
-                {pct != null ? <><span className="bone-fill" style={{ width: `${pct}%` }} /><span className="bone-dot" style={{ left: `${pct}%` }} /></> : <span className="bone-none" />}
+                {pct != null ? <><span className="bone-fill" style={{ ['--p' as string]: `${pct}%` }} /><span className="bone-dot" style={{ ['--p' as string]: `${pct}%` }} /></> : <span className="bone-none" />}
               </span>
               <span className="bone-y num">{r.year ?? ''}</span>
             </Pressable>
@@ -353,7 +353,7 @@ function TimelineCard({ rows, onOpen }: { rows: HistoryRow[]; onOpen: () => void
       <span className="b-big">{rows.length}<small>{fill(S.recordsSince, { year: rows[0].date.slice(0, 4) })}</small></span>
       <span className="tl-axis" aria-hidden="true" style={{ marginTop: 'auto' }}>
         {rows.map((r, i) => (
-          <span key={i} className={`tl-pin tone-${HISTORY_TONE[r.kind]}`} style={{ left: `${((yr(r.date) - from) / (now - from)) * 100}%` }} />
+          <span key={i} className={`tl-pin tone-${HISTORY_TONE[r.kind]}`} style={{ ['--p' as string]: `${((yr(r.date) - from) / (now - from)) * 100}%` }} />
         ))}
       </span>
       <span className="axis num" aria-hidden="true"><span>{from}</span><span>{now - 1}</span></span>
