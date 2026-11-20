@@ -60,15 +60,17 @@ Two real examples (real city records; the listing text is an example):
   more) and FEMA flood maps, in parallel with timeouts, a retry and a 24 h cache.
 - **Rules, not vibes**: deterministic code assigns every label, case, cost and decision. Money uses the FY
   2026-27 tax rate resolution, supplemental proration and the Article 12-C transfer tax.
-- **LLM**: the local **Claude Code CLI** (`claude -p --json-schema`, Claude Opus 5.5) parses the listing,
-  reads permit descriptions and writes the short answer. Every sentence must pass copy and citation checks and
-  may not introduce a number absent from the evidence; otherwise a rule-written sentence is used. No API key.
+- **LLM**: Claude reads the listing, reads permit descriptions, writes the short answer and rewrites every
+  finding in plain words. On the hosted site it runs through the Claude API (Claude Haiku 5.5, structured
+  output); locally without a key, through the Claude Code CLI. Every sentence must pass copy and citation
+  checks and may not introduce a number or citation absent from the evidence; otherwise the rule-written
+  sentence is kept.
 - **Actions**: Resend email (outbox file in demo mode), idempotency keys, `.ics` invites for specialist
   requests, an action log stored with the report.
 - **Fair housing**: no crime, school or demographic data; no personal names from city records.
 
 ## Tools used
-Claude Code (CLI, Claude Opus 5.5), Next.js 16, React 19, TypeScript, Phosphor icons, DataSF (Socrata),
+Claude API (Claude Haiku 5.5), Claude Code, Next.js 16, React 19, TypeScript, Phosphor icons, DataSF (Socrata),
 FEMA NFHL, Resend, Vitest, Playwright (demo recording), ffmpeg.
 
 ## Sponsor tools
@@ -89,9 +91,8 @@ FEMA NFHL, Resend, Vitest, Playwright (demo recording), ffmpeg.
 - Demo video: `submission/demo.mp4` in the repo (2:01, 1440×900, recorded from the real app with captions). Upload it somewhere shareable for the form.
 - Screenshots: `submission/screenshots/` (1 verdict and tiles, 2 listing vs city, 3 specialist request
   confirm, 4 phone view).
-- Website: https://house-checker-chi.vercel.app (real city data. On the hosted site the sentences are
-  rule-written, because the Claude Code CLI runs locally, and emails and specialist requests go to a demo outbox.
-  The full agent with Claude runs locally: `npm run build && npm run start`.)
+- Website: https://house-checker-chi.vercel.app (live city data for any San Francisco address, Claude through
+  the API. Emails and specialist requests go to a demo outbox.)
 
 ## How to run
 ```

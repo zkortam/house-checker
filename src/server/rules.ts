@@ -320,18 +320,18 @@ export function buildReport(input: RuleInput): Report {
     const rest = activeSorted.slice(SHOWN);
     const oldest = rest[rest.length - 1];
     cases.push({ glyph: 'violation', title: `${rest.length} more open complaints`, label: 'open_case',
-      text: `${rest.length} older complaints are also active, the oldest filed ${fmtDate(oldest.date_filed)} ${c(S.complaint(oldest))}. Ask the seller for the full list.`,
-      stake: `${money(152)} a month in monitoring fees while open ${c(S.dbiFees())}` });
+      text: `${rest.length} more complaints to the city's building department are still open. The oldest is from ${fmtDate(oldest.date_filed)} ${c(S.complaint(oldest))}. Ask the seller for the full list.`,
+      stake: `While they stay open, the owner pays the city ${money(152)} a month in inspection fees ${c(S.dbiFees())}` });
   }
   const openPlanning = planning.filter((p) => /ENF/.test(p.record_type ?? p.record_id ?? '') && !/^closed/i.test(p.record_status ?? ''));
   for (const p of openPlanning) {
     const aboutUnit = ILLEGAL_UNIT.test(lower(p.description));
     const newerCfc = aboutUnit && unitCfc && day(unitCfc.date_issued) > day(p.open_date);
     cases.push({
-      glyph: 'planning', title: `Planning enforcement case still "${lower(p.record_status)}"`, label: newerCfc ? 'likely_stale' : 'open_case',
+      glyph: 'planning', title: newerCfc ? 'An old city case about the in-law was never closed' : 'A city planning case is still open', label: newerCfc ? 'likely_stale' : 'open_case',
       text: newerCfc
-        ? `Case ${p.record_id}, opened ${fmtDate(p.open_date)}, notes an unauthorized unit. The unit was certified in ${year(unitCfc!.date_issued)}, so this is probably outdated ${c(S.planning(p), S.cfc(unitCfc!))}.`
-        : `Case ${p.record_id}, opened ${fmtDate(p.open_date)}, is still open ${c(S.planning(p))}.`,
+        ? `In ${year(p.open_date)} the city opened a case because the in-law unit had no permit. The unit was made legal in ${year(unitCfc!.date_issued)}, so the case was most likely never closed ${c(S.planning(p), S.cfc(unitCfc!))}. Ask the seller to get it closed before you buy (case ${p.record_id}).`
+        : `The city's planning department opened a case here on ${fmtDate(p.open_date)}, and it is still open ${c(S.planning(p))}. Ask the seller what it is about and when it will close (case ${p.record_id}).`,
     });
   }
 
@@ -418,28 +418,28 @@ export function buildReport(input: RuleInput): Report {
   for (const b of buyouts.slice(0, 3)) {
     const amt = n(b.buyout_amount);
     const t = n(b.number_of_tenants);
-    tenants.push({ glyph: 'tenants', title: `Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}`,
-      text: `Buyout ${b.case_number}, filed ${fmtDate(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}: ${amt ? money(amt) + ' paid' : 'paid'} to ${t ?? 'the'} tenant${t === 1 ? '' : 's'} to leave ${c(S.buyout(b, addr.display, addrUpper))}. ${multiParcel ? 'This was filed for the building. Ask the Rent Board whether it involved this unit.' : 'A past buyout can limit converting the units to condos later. Ask the Rent Board how it applies.'}` });
+    tenants.push({ glyph: 'tenants', title: `Tenants were paid to move out in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}`,
+      text: `In ${fmtDate(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)} the owner paid ${t ? `${t} tenant${t === 1 ? '' : 's'}` : 'the tenants'}${amt ? ` ${money(amt)}` : ''} to move out ${c(S.buyout(b, addr.display, addrUpper))}. ${multiParcel ? 'It was filed for the whole building, so ask the Rent Board whether it involved this unit.' : 'Because of this, city rules can stop you from turning the units into condos for years. The Rent Board can tell you how it applies here.'} (Buyout ${b.case_number})` });
   }
   const hotelStart = hotel.map((h) => h.location_start_date).filter(Boolean).sort()[0] ?? null;
   const hotelSrc = hotel.length ? S.hotelTax(slug, addr.display, day(hotelStart) || null) : null;
   if (hotel.length) {
-    tenants.push({ glyph: 'money', title: 'Short-term rental signal',
-      text: `A business at this address has been registered for hotel tax since ${fmtDate(hotelStart)} ${c(hotelSrc)}. That usually means short-term rentals. Ask whether any bookings run past closing.` });
+    tenants.push({ glyph: 'money', title: 'It may be rented out short term',
+      text: `Someone has paid the city's hotel tax from this address since ${fmtDate(hotelStart)} ${c(hotelSrc)}. That usually means it is listed on sites like Airbnb. Ask whether any guests are booked after you would move in.` });
   }
   const unitsNow = recordUnits ?? rollUnits ?? 1;
   const preRentControl = yearBuilt != null && yearBuilt < 1979;
   if (unitsNow >= 2 && preRentControl) {
-    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `${cap(word(unitsNow))} units in a building from ${yearBuilt}. Units like these are usually covered by eviction protections, and often by rent limits. Confirm with the Rent Board before you plan to move in or rent out.` });
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `This is a ${word(unitsNow)}-unit building from ${yearBuilt}. In San Francisco, units in older buildings like this usually come with rent control and strong tenant protections. If you plan to rent a unit or have a tenant leave, check with the Rent Board first.` });
   } else if (unitsNow >= 2) {
-    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `${cap(word(unitsNow))} units${yearBuilt ? ` in a building from ${yearBuilt}` : ''}. Eviction protections can still apply. Confirm with the Rent Board.` });
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `${cap(word(unitsNow))} units${yearBuilt ? ` in a building from ${yearBuilt}` : ''}. Tenants here can still have protection from eviction. Check with the Rent Board before you rent out or ask anyone to leave.` });
   } else {
-    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `One legal unit. A rented ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden' : 'in-law'} unit, permitted or not, can bring eviction protections with it. Confirm with the Rent Board.` });
+    tenants.push({ glyph: 'tenants', title: 'Rent control', text: `One legal unit. If the ${/garden (?:in-?law|unit|cottage)/i.test(input.listingText) ? 'garden' : 'in-law'} unit is rented, that tenant can be protected from eviction even if the unit never had a permit. Check with the Rent Board.` });
   }
   if (firstUnitComplaint && unitsNow >= 2) {
-    tenants.push({ glyph: 'complaint', title: 'Tenants now', text: `Not in public records. The ${year(firstUnitComplaint.date_filed)} complaint described a renter in the ${/garage/.test(complaintText(firstUnitComplaint)) ? 'garage ' : ''}unit ${c(S.complaint(firstUnitComplaint))}. Ask whether either unit is occupied.` });
+    tenants.push({ glyph: 'complaint', title: 'Someone may live here now', text: `Public records do not say who lives here today. A ${year(firstUnitComplaint.date_filed)} complaint mentioned a tenant in the ${/garage/.test(complaintText(firstUnitComplaint)) ? 'garage ' : ''}unit ${c(S.complaint(firstUnitComplaint))}. Ask the seller whether either unit is rented.` });
   } else if (!buyouts.length && !hotel.length) {
-    tenants.push({ glyph: 'resolved', title: 'No buyouts or hotel-tax registrations', text: `No tenant buyout on file for this address ${c(S.noBuyout(pid))}.`, muted: true });
+    tenants.push({ glyph: 'resolved', title: 'No tenant buyouts', text: `The city has no record of tenants being paid to move out of this address ${c(S.noBuyout(pid))}.`, muted: true });
   }
 
   /* ----- upside ----- */
@@ -454,11 +454,11 @@ export function buildReport(input: RuleInput): Report {
   const sb9 = !!zoning && /^RH-1/.test(zoning) && lotSqft != null && lotSqft >= 2400 && !historic;
   if (lotSqft && (!zoning || /^RH-1/.test(zoning))) { // SB 9 only applies in one-family districts
     upside.push({ glyph: 'grow', title: `Lot ${int(lotSqft)} sq ft`,
-      text: sb9 ? `Above the 2,400 sq ft minimum for an SB 9 lot split. SB 9 is off the table if a unit was rented in the last 3 years ${c(rollSrc)}.`
+      text: sb9 ? `Big enough that state law (SB 9) may let you split it into two lots and build. That option is gone if a unit was rented in the last 3 years ${c(rollSrc)}.`
         : lotSqft >= 2400 ? `Large enough for an SB 9 split only in a one-family district ${c(rollSrc)}.` : `Below the 2,400 sq ft minimum for an SB 9 lot split ${c(rollSrc)}.` });
   }
   if (historic) {
-    upside.push({ glyph: 'planning', title: 'Historic district', text: `In the ${historic.name_1?.replace(/ Historic District$/i, '')} landmark district, so exterior changes go through historic review ${c(S.historic(pid, historic.name_1 ?? 'district'))}.` });
+    upside.push({ glyph: 'planning', title: 'Historic district', text: `In the ${historic.name_1?.replace(/ Historic District$/i, '')} historic district, so changes to the outside need extra city review ${c(S.historic(pid, historic.name_1 ?? 'district'))}.` });
   }
 
   /* ----- hazards ----- */
@@ -475,7 +475,7 @@ export function buildReport(input: RuleInput): Report {
     hazards.push(hz.liquefaction == null ? { key: 'liquefaction', title: 'Liquefaction', status: 'unknown', text: 'The state liquefaction map did not answer' }
       : { key: 'liquefaction', title: 'Liquefaction', status: hz.liquefaction ? 'note' : 'clear', text: hz.liquefaction ? `Inside a state liquefaction zone ${c(hs)}. Ask about the foundation.` : `Outside the state liquefaction zone ${c(hs)}` });
     if (hz.landslideZone) hazards.push({ key: 'landslide', title: 'Landslide', status: 'note', text: `Inside a state landslide zone ${c(hs)}${hz.landslideClass ? `, susceptibility class ${hz.landslideClass} of 10 ${c(S.landslide(pid))}` : ''}. Worth raising with the inspector.` });
-    else if ((hz.landslideClass ?? 0) >= 7) hazards.push({ key: 'landslide', title: 'Landslide', status: 'note', text: `Susceptibility class ${hz.landslideClass} on the city's landslide map, where 10 is highest ${c(S.landslide(pid))}. Worth raising with a structural engineer.` });
+    else if ((hz.landslideClass ?? 0) >= 7) hazards.push({ key: 'landslide', title: 'Landslide', status: 'note', text: `The city rates this spot ${hz.landslideClass} out of 10 for landslide risk, where 10 is highest ${c(S.landslide(pid))}. Ask a structural engineer to look at the slope and foundation.` });
     else hazards.push({ key: 'landslide', title: 'Landslide', status: hz.landslideZone == null ? 'unknown' : 'clear', text: hz.landslideZone == null ? 'The state landslide map did not answer' : `Outside the state landslide zone ${c(hs)}` });
     hazards.push(hz.tsunami == null ? { key: 'tsunami', title: 'Tsunami', status: 'unknown', text: 'The tsunami map did not answer' }
       : { key: 'tsunami', title: 'Tsunami', status: hz.tsunami ? 'note' : 'clear', text: hz.tsunami ? `Inside the tsunami hazard area ${c(hs)}` : `Outside the tsunami hazard area ${c(hs)}` });
@@ -483,10 +483,10 @@ export function buildReport(input: RuleInput): Report {
       : { key: 'sea_level', title: 'Sea level rise', status: hz.seaLevel ? 'note' : 'clear', text: hz.seaLevel ? `Inside the sea level rise maps ${c(S.sealevel(pid))}` : `Outside the sea level rise maps, even with 66 inches of rise ${c(S.sealevel(pid))}` });
     const res = hz.reservoirs;
     hazards.push(res == null ? { key: 'reservoir', title: 'Reservoir', status: 'unknown', text: 'The reservoir map did not answer' }
-      : res.length ? { key: 'reservoir', title: 'Reservoir', status: 'note', text: `Inside the ${res.join(' and ')} reservoir${res.length > 1 ? 's' : ''}' failure zone${res.length > 1 ? 's' : ''} ${c(S.reservoir(pid))}. Ask your insurer whether it changes the quote.` }
+      : res.length ? { key: 'reservoir', title: 'Reservoir', status: 'note', text: `If the ${res.join(' and ')} reservoir${res.length > 1 ? 's' : ''} ever failed, water could reach this block ${c(S.reservoir(pid))}. It is rare, but ask your insurer whether it changes your quote.` }
       : { key: 'reservoir', title: 'Reservoir', status: 'clear', text: `Outside every reservoir failure zone ${c(S.reservoir(pid))}` });
     hazards.push(hz.maher == null ? { key: 'soil', title: 'Soil', status: 'unknown', text: 'The Maher soil map did not answer' }
-      : { key: 'soil', title: 'Soil', status: hz.maher ? 'note' : 'clear', text: hz.maher ? `Inside the Maher soil testing area ${c(S.maher(pid))}. Digging needs soil testing.` : `Outside the Maher soil testing area ${c(S.maher(pid))}` });
+      : { key: 'soil', title: 'Soil', status: hz.maher ? 'note' : 'clear', text: hz.maher ? `The soil here may be contaminated from old fill ${c(S.maher(pid))}. Any digging needs a soil test first.` : `Outside the Maher soil testing area ${c(S.maher(pid))}` });
   }
 
   /* ----- nearby ----- */
@@ -579,15 +579,15 @@ export function buildReport(input: RuleInput): Report {
       status: aduRow?.label === 'no_permit_found' ? 'In-law not permitted' : !unitsRow ? 'Listing is silent' : ['matches', 'permitted_not_updated', 'resolved', 'matches_planning'].includes(unitsRow.label) ? 'Matches listing' : LABELS[unitsRow.label].text },
     { section: 'cases', glyph: active.length ? 'violation' : 'planning', label: 'Open city cases', value: String(openCount),
       tone: !openCount ? 'success' : cases.every((x) => x.label === 'likely_stale') ? 'warning' : 'error',
-      status: !openCount ? 'None open' : cases.every((x) => x.label === 'likely_stale') ? 'Probably outdated' : active.length ? 'Active complaints' : 'Open case' },
+      status: !openCount ? 'None open' : cases.every((x) => x.label === 'likely_stale') ? 'Likely never closed' : active.length ? 'Complaints still open' : 'Still open' },
     { section: 'costs', glyph: 'money', label: 'Property tax', value: null, tone: 'neutral', status: claims.price ? 'A month at asking' : 'A month at assessed value' },
     buyouts.length
-      ? { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: `Buyout ${year(buyouts[0].buyout_agreement_date ?? buyouts[0].pre_buyout_disclosure_declaration_date)}`, tone: 'warning', status: unitsNow >= 2 && preRentControl ? 'Rent rules likely' : 'Past buyout' }
-      : hotel.length ? { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: 'Short-term', tone: 'warning', status: 'Hotel-tax registration' }
+      ? { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: `Buyout ${year(buyouts[0].buyout_agreement_date ?? buyouts[0].pre_buyout_disclosure_declaration_date)}`, tone: 'warning', status: unitsNow >= 2 && preRentControl ? 'Rent control likely' : 'Past buyout' }
+      : hotel.length ? { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: 'Short-term', tone: 'warning', status: 'Likely an Airbnb' }
       : { section: 'tenants', glyph: 'tenants', label: 'Tenants', value: 'None found', tone: 'success', status: 'No buyouts on file' },
     { section: 'hazards', glyph: firstNote?.key === 'reservoir' ? 'reservoir' : firstNote?.key === 'landslide' ? 'landslide' : /flood/.test(firstNote?.key ?? '') ? 'flood' : 'hazard', label: 'Hazards',
       value: hazards.length ? `${notes.length} of ${hazards.length}` : null, tone: !hazards.length ? 'neutral' : notes.length ? 'warning' : 'success', status: hazardStatus },
-    sb9 ? { section: 'upside', glyph: 'grow', label: 'Room to grow', value: 'Lot split', tone: 'info', status: 'Check SB 9 rules' }
+    sb9 ? { section: 'upside', glyph: 'grow', label: 'Room to grow', value: 'Lot split', tone: 'info', status: 'You could split the lot' }
       : { section: 'upside', glyph: 'zoning', label: 'Room to grow', value: zoning, tone: 'info', status: historic ? 'Historic district' : zoning && /^RH-[23]|^RM/.test(zoning) ? 'More units allowed' : 'Zoning' },
   ];
 
@@ -651,8 +651,8 @@ export function buildReport(input: RuleInput): Report {
     const who = t ? `${t} tenant${t === 1 ? '' : 's'}` : 'tenants';
     watch.push(`Tenant buyout in ${year(b.buyout_agreement_date ?? b.pre_buyout_disclosure_declaration_date)}${multiParcel ? ' in the building' : ''}${amt ? `: ${money(amt)} to ${who}` : t ? ` with ${who}` : ''} ${c(S.buyout(b, addr.display, addrUpper))}`);
   }
-  if (hotel.length) watch.push(`Hotel-tax registration since ${year(hotelStart)}, a sign of short-term rentals ${c(hotelSrc)}`);
-  for (const h of notes) watch.push(h.key === 'reservoir' ? `Inside the ${hz?.reservoirs?.length === 2 && hz.reservoirs.every((r) => /^Sunset/.test(r)) ? 'Sunset' : (hz?.reservoirs ?? []).join(' and ')} reservoirs failure zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
+  if (hotel.length) watch.push(`Likely rented on Airbnb or similar since ${year(hotelStart)} ${c(hotelSrc)}`);
+  for (const h of notes) watch.push(h.key === 'reservoir' ? `In the flood path if a nearby reservoir failed ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim()
     : h.key === 'landslide' ? (hz?.landslideZone ? `Inside a state landslide zone ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim() : `Landslide susceptibility class ${hz?.landslideClass} of 10 ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim())
     : `${({ flood: 'Inside a FEMA flood zone', storm_flood: 'Inside the 100-year storm flood zone', liquefaction: 'Inside a state liquefaction zone', tsunami: 'Inside the tsunami hazard area', sea_level: 'Inside the sea level rise maps', soil: 'Inside the Maher soil testing area' } as Record<string, string>)[h.key] ?? h.title} ${h.text.match(/\[\d+\]/)?.[0] ?? ''}`.trim());
   if (nearby.length) {
@@ -796,7 +796,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (x.multiParcel) {
     const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
     if (x.active.length) return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building` : 'A condo unit'} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} at the address ${x.c(...x.active.slice(0, 2).map(S.complaint))}. Ask whether ${x.active.length > 1 ? 'they involve' : 'it involves'} this unit.`;
-    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : !x.ledger.length ? `No open city complaints at the address${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.` : x.ledger.some((r) => !MATCHED.includes(r.label)) ? `City records don't settle ${claimList(x.ledger.filter((r) => !MATCHED.includes(r.label)))}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
+    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${x.tone === 'clear' && onlySize(differ) ? sizeGap(differ) : differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : !x.ledger.length ? `No open city complaints at the address${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.` : x.ledger.some((r) => !MATCHED.includes(r.label)) ? `City records don't settle ${claimList(x.ledger.filter((r) => !MATCHED.includes(r.label)))}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
   }
   if (x.unitLegalized && x.lastUnitPermit) {
     const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
@@ -807,6 +807,9 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
     return `${A} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} ${x.c(...x.active.slice(0, 2).map(S.complaint))}${x.aduRow?.label === 'no_permit_found' ? ', and no permit for the in-law' : ''}.${x.ledger.some((r) => r.key === 'renovation') ? ' Work is permitted but not signed off.' : ` Ask how ${x.active.length > 1 ? 'they' : 'it'} will be closed before you offer.`}`;
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
+  // With a clear verdict the only gaps are the assessor's size and bedroom figures, which often lag the house.
+  if (x.tone === 'clear' && onlySize(problems))
+    return `${A}. ${sizeGap(problems)}`;
   if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${claimList(problems)}.`;
   // Only say "match the listing" when the listing claimed something the records confirm.
   const roll = x.rollSrc ? ' ' + x.c(x.rollSrc) : '';
@@ -815,6 +818,13 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (unsettled.length) return `${A}. ${unsettled.length === x.ledger.length ? 'City records' : 'Other claims match, but city records'} don't settle ${claimList(unsettled)}.`;
   return `${A} whose records match the listing${roll}.`;
 }
+/** Only the assessor's size or bedroom figures differ: common, and worth one question, not alarm. */
+function sizeGap(rows: ClaimRow[]): string {
+  const names = rows.map((r) => (r.key === 'sqft' ? 'square footage' : 'bedroom count')).join(' and ');
+  const refs = [...new Set(rows.map((r) => r.why.match(/\[\d+\]/)?.[0]).filter(Boolean))].join('');
+  return `The assessor's ${names} ${rows.length > 1 ? 'differ' : 'differs'} from the listing${refs ? ' ' + refs : ''}, which is common in older records. Ask how the listing ${rows.length > 1 ? 'counted them' : rows[0].key === 'sqft' ? 'measured it' : 'counted them'}.`;
+}
+const onlySize = (rows: ClaimRow[]) => rows.length > 0 && rows.every((r) => r.key === 'sqft' || r.key === 'beds');
 const MATCHED: FindingLabel[] = ['matches', 'resolved', 'matches_planning', 'permitted_not_updated'];
 
 function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[]; hotelStart: string | null; trade: Row[]; listingText: string }): Report['drafts'] {

@@ -291,6 +291,7 @@ export interface ApiError {
   reference?: string;       // for unavailable: shown as "Reference 7F3K2Q9A"
   field?: 'listingText' | 'to' | 'slot';
   debug?: string;           // logs only, never rendered
+  suggest?: string[];       // not_found: real addresses nearby on the same street
 }
 
 /* ---------- Other endpoints (all JSON) ---------- */

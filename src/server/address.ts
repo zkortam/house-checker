@@ -149,11 +149,49 @@ export function parcelDisplay(parcels: ParcelRef[]): string {
 }
 
 /** For a model-returned address with no street type ("1200 Cole"): number + name; the resolver then matches any type. */
-export function parseAddressLoose(s: string): ParsedAddress | null {
-  const strict = parseAddress(s);
+export function parseAddressLoose(input: string): ParsedAddress | null {
+  const strict = parseAddress(input);
   if (strict) return strict;
-  const m = s.trim().match(/^(\d{1,5})([A-Za-z])?\s+([A-Za-z0-9][A-Za-z0-9 .'-]{1,40}?)\s*(?:,|$)/);
+  // "301 mission #45e, sf": take the unit and the city off, then number + name.
+  let s = input.trim();
+  const um = s.match(/\s*(?:#|\bunit\s+|\bapt\.?\s+|\bsuite\s+)\s*([A-Za-z0-9-]{1,6})\b/i);
+  const unit = um ? um[1].toUpperCase() : null;
+  if (um) s = s.slice(0, um.index) + s.slice(um.index! + um[0].length);
+  s = s.replace(/[,\s]+(?:san francisco|sf|s\.f\.)\b.*$/i, '').replace(/[,\s]+(?:ca|california)\b.*$/i, '').trim();
+  const m = s.match(/^(\d{1,5})([A-Za-z])?\s+([A-Za-z0-9][A-Za-z0-9 .'-]{1,40}?)\s*(?:,|$)/);
   if (!m) return null;
   const street = m[3].trim().toUpperCase().replace(/\s+/g, ' ');
-  return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit: null };
+  if (NOT_STREET.test(street)) return null;
+  return { number: m[1], suffix: m[2]?.toUpperCase() ?? null, street, type: null, display: `${m[1]}${m[2]?.toUpperCase() ?? ''} ${title(street)}`, unit };
+}
+
+/** A typed address and nothing else ("57 carmelita", "301 mission #45e, sf"). Anything after the street name other
+ *  than a unit, SF, CA or a zip ("12 Main St Novato") means it isn't bare, so the caller reads it the long way. */
+export function bareAddress(text: string): ParsedAddress | null {
+  const t = text.trim();
+  if (t.length > 80 || /\n/.test(t) || /\$|\b(bed|beds|bath|baths|bd|ba|br|sq|units?|price)\b/i.test(t)) return null;
+  const a = parseAddressLoose(t);
+  if (!a) return null;
+  const tail = t.replace(/\s*(?:#|\bunit\s+|\bapt\.?\s+|\bsuite\s+)\s*[A-Za-z0-9-]{1,6}\b/i, '')
+    .replace(/\b(?:san francisco|sf|s\.f\.|ca|california|9\d{4})\b/gi, '').replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
+  const last = (tail.split(/\s+/).pop() ?? '').toLowerCase();
+  const nameEnd = a.street.split(' ').pop()!.toLowerCase();
+  return last === nameEnd || (a.type && TYPES[last] === a.type) ? a : null;
+}
+
+/** For an address the city has no record of: up to 3 real numbers on the same street, closest first. */
+export async function nearbyAddresses(a: ParsedAddress): Promise<string[]> {
+  const n = Number(a.number);
+  if (!Number.isFinite(n)) return [];
+  const base = `street_name=${q(a.street)} AND address_number between ${Math.max(0, n - 80)} and ${n + 80}`;
+  const rows = await soql<{ address_number: string; street_type?: string }>('ramy-di5m',
+    { where: a.type ? `${base} AND street_type=${q(a.type)}` : base, select: 'address_number,street_type', limit: 400 }, { label: 'parcel' }).catch(() => []);
+  const seen = new Set<string>();
+  return rows
+    .map((r) => ({ num: Number(r.address_number), type: r.street_type ?? a.type }))
+    .filter((r) => Number.isFinite(r.num) && r.num !== n)
+    .sort((x, y) => Math.abs(x.num - n) - Math.abs(y.num - n) || x.num - y.num)
+    .map((r) => `${r.num} ${title(a.street)}${r.type ? ' ' + (TYPE_DISPLAY[r.type] ?? title(r.type)) : ''}`)
+    .filter((d) => (seen.has(d) ? false : (seen.add(d), true)))
+    .slice(0, 3);
 }

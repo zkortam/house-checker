@@ -135,3 +135,33 @@ describe('price in a pasted listing page', () => {
     expect(readListingRegex('Zestimate: $1,402,300. 1214 Fell St SF. $1,295,000').price).toBe(1295000);
   });
 });
+
+describe('Redfin layout', () => {
+  it('reads counts on their own line', () => {
+    const page = '1214 Fell St, San Francisco, CA 94117\nRedfin Estimate $1,380,000\n$1,295,000\nPrice\n3\nBeds\n2.5\nBaths\n1,520\nSq Ft\nLot Size: 2,495 Sq. Ft.';
+    expect(readListingRegex(page)).toMatchObject({ price: 1295000, beds: 3, baths: 2.5, sqft: 1520 });
+  });
+});
+
+describe('SF unit phrasing', () => {
+  it('reads flats and a 2nd unit', () => {
+    expect(readListingRegex('Edwardian two flats, 600 Clement St SF').units).toBe(2);
+    expect(readListingRegex('Legal 2nd unit downstairs, 600 Clement St').adu).toBe('legal');
+  });
+});
+
+describe('bare typed addresses', () => {
+  it('reads them without a street type and without the model', async () => {
+    const r = await readListing('301 mission #45e');
+    expect(r).toMatchObject({ ok: true, claims: { address: '301 Mission #45E' } });
+    expect(await readListing('57 carmelita')).toMatchObject({ ok: true, claims: { address: '57 Carmelita' } });
+    expect((await readListing('hello world')).ok).toBe(false);
+  });
+});
+
+describe('other city right after the street', () => {
+  it('catches "12 Main St Oakland" without a comma', async () => {
+    expect(await readListing('12 Main St Oakland')).toEqual({ ok: false, kind: 'outside_sf' });
+    expect((await readListing('2401 Sacramento St')).ok).toBe(true);
+  });
+});
