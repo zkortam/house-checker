@@ -80,6 +80,8 @@ export function buildReport(input: RuleInput): Report {
   const latestYear = rollRows.reduce((m, r) => Math.max(m, Number(r.closed_roll_year ?? 0)), 0);
   const roll = rollRows.find((r) => Number(r.closed_roll_year) === latestYear) ?? null;
   const rollSrc = roll ? S.roll(roll.parcel_number ?? pid, String(latestYear)) : null;
+  // An address-only check has no ledger to cite the roll first, so it would show up as [15] in the opening answer.
+  if (rollSrc && claims.units == null && claims.beds == null && claims.baths == null && claims.sqft == null && !claims.adu && !claims.renovations?.length) cites.n(rollSrc);
   const lien = latestYear ? `${latestYear}-01-01` : null;
   const yearBuilt = n(roll?.year_property_built) || null;
   const lotSqft = n(roll?.lot_area) || null;
@@ -131,6 +133,9 @@ export function buildReport(input: RuleInput): Report {
   const ledger: ClaimRow[] = [];
   const listingUnits = claims.units;
 
+  // "4 bed with legal ADU" and no unit count, on a lot the city counts as two legal units: the in-law is the second unit.
+  const aduIsSecondUnit = listingUnits == null && !!claims.adu && !unitLegalized && (recordUnits ?? rollUnits ?? 1) === 2;
+
   // Units
   if (listingUnits != null || claims.adu) {
     const lu = listingUnits ?? 1;
@@ -144,6 +149,11 @@ export function buildReport(input: RuleInput): Report {
         why: label === 'permitted_not_updated'
           ? `Permit ${lastUnitPermit.permit_number} ${unitLegalized ? 'legalized the ground-floor unit under the ADU program' : `changed the building from ${lastUnitPermit.existing_units?.replace('.0', '')} to ${recordUnits} units`} and closed with a certificate of final completion on ${fmtDate(unitCfc?.date_issued ?? lastUnitPermit.completed_date)} ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}. The assessor's roll is a snapshot from ${fmtDate(lien)}, before that work finished ${c(rollSrc)}.`
           : `Permit ${lastUnitPermit.permit_number} set the building at ${recordUnits} units ${c(permitSrc, unitCfc ? S.cfc(unitCfc) : null)}, and the assessor agrees ${c(rollSrc)}.`,
+      });
+    } else if (aduIsSecondUnit) {
+      ledger.push({
+        key: 'units', title: 'Units', listing: '1 plus in-law', records: '2', label: 'matches',
+        why: `City records count two legal units ${c(rollSrc)}, so the in-law can be the second one.`,
       });
     } else if (adu && !unitLegalized && (listingUnits == null || listingUnits === (recordUnits ?? rollUnits ?? 1))) {
       const base = recordUnits ?? rollUnits ?? 1;
@@ -241,6 +251,12 @@ export function buildReport(input: RuleInput): Report {
         why: label === 'resolved'
           ? `Complaints in ${yrsText} cited an illegal unit${detail} ${c(S.complaint(firstUnitComplaint!))}. The ${year(lastUnitPermit.filed_date)} permit was filed to comply with ${novCount === 2 ? 'both notices' : novCount > 2 ? 'the notices' : 'the notice'} of violation and is complete ${c(S.permit(lastUnitPermit))}.`
           : `Permit ${lastUnitPermit.permit_number} created the unit and is complete ${c(S.permit(lastUnitPermit))}.`,
+      });
+    } else if (aduIsSecondUnit && !liveUnit[0]) {
+      ledger.push({
+        key: 'adu', title: 'In-law', listing: claims.adu === 'legal' ? 'Legal' : /garden/i.test(input.listingText) ? 'Garden in-law' : 'In-law',
+        records: 'Legal 2nd unit', label: 'matches',
+        why: `City records count two legal units ${c(rollSrc)}. Ask which one the listing calls the in-law.`,
       });
     } else {
       const live = liveUnit[0];
@@ -775,7 +791,7 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   if (x.multiParcel) {
     const differ = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled', 'open_case'].includes(r.label));
     if (x.active.length) return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building` : 'A condo unit'} with ${word(x.active.length)} active city complaint${x.active.length > 1 ? 's' : ''} at the address ${x.c(...x.active.slice(0, 2).map(S.complaint))}. Ask whether ${x.active.length > 1 ? 'they involve' : 'it involves'} this unit.`;
-    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
+    return `${x.unitsNow >= 2 ? `A condo unit in a ${word(x.unitsNow)}-unit building.` : 'A condo unit.'} ${differ.length ? `${differ.length === 1 ? 'One listing claim differs' : `${cap(word(differ.length))} listing claims differ`} from city records: ${claimList(differ)}.` : !x.ledger.length ? `No open city complaints at the address${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.` : x.ledger.some((r) => !MATCHED.includes(r.label)) ? `City records don't settle ${claimList(x.ledger.filter((r) => !MATCHED.includes(r.label)))}.` : `The unit's records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`}`;
   }
   if (x.unitLegalized && x.lastUnitPermit) {
     const stale = x.ledger.some((r) => r.label === 'permitted_not_updated');
@@ -787,8 +803,14 @@ function ruleAnswer(x: { unsafe?: Row | null; multiParcel: boolean; unitsNow: nu
   }
   const problems = x.ledger.filter((r) => ['no_permit_found', 'records_differ', 'permitted_not_finaled'].includes(r.label));
   if (problems.length) return `${A}. ${problems.length === 1 ? 'One listing claim differs' : `${cap(word(problems.length))} listing claims differ`} from city records: ${claimList(problems)}.`;
-  return `${A} whose records match the listing${x.rollSrc ? ' ' + x.c(x.rollSrc) : ''}.`;
+  // Only say "match the listing" when the listing claimed something the records confirm.
+  const roll = x.rollSrc ? ' ' + x.c(x.rollSrc) : '';
+  if (!x.ledger.length) return `${A} on record${roll}, with no open city complaints.`;
+  const unsettled = x.ledger.filter((r) => !MATCHED.includes(r.label));
+  if (unsettled.length) return `${A}. ${unsettled.length === x.ledger.length ? 'City records' : 'Other claims match, but city records'} don't settle ${claimList(unsettled)}.`;
+  return `${A} whose records match the listing${roll}.`;
 }
+const MATCHED: FindingLabel[] = ['matches', 'resolved', 'matches_planning', 'permitted_not_updated'];
 
 function ruleDrafts(x: { addr: ResolvedAddress; unknowns: Unknown[]; cases: CaseRow[]; openPlanning: Row[]; lastUnitPermit: Row | null; unitCfc: Row | null; agentEmail: string | null; permits: Row[]; ledger: ClaimRow[]; active: Row[]; hotelStart: string | null; trade: Row[]; listingText: string }): Report['drafts'] {
   const a = x.addr.display;

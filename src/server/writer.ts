@@ -33,6 +33,14 @@ export function rejectReason(text: string, evidence: string, sourceCount: number
   return null;
 }
 
+/** A sentence that states a city record with a number must carry its citation ("records show a 20-unit building" alone fails). */
+export function uncitedRecord(text: string): string | null {
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    if (/\d/.test(sentence.replace(/\[\d+\]/g, '')) && /\b(records?|city|assessor|permits?|complaints?|zone|class)\b/i.test(sentence) && !/\[\d+\]/.test(sentence)) return sentence;
+  }
+  return null;
+}
+
 export function acceptable(text: string, evidence: string, sourceCount: number, maxLength: number): boolean {
   return rejectReason(text, evidence, sourceCount, maxLength) === null;
 }
@@ -51,6 +59,7 @@ const SYSTEM = [
   'Plain words, no jargon, no markdown, no exclamation marks, no em dashes, never "we", "our", "us", "please", "just" or "simply".',
   'Never call a listing illegal or misrepresented. Say what the records show.',
   'Use only facts and numbers from the evidence. Cite with [n] exactly as the evidence does. Never invent a citation.',
+  'Every sentence that states what city records show ends with its [n] citation.',
 ].join(' ');
 
 export async function writeProse(report: Report): Promise<Report> {
@@ -70,7 +79,7 @@ export async function writeProse(report: Report): Promise<Report> {
   if (llmEnabled()) {
     try {
       const hit = JSON.parse(await readFile(cacheFile, 'utf8')) as { answer: string; inspection: string };
-      if (acceptable(hit.answer, evidence, sources, 220) && acceptable(hit.inspection, evidence, sources, 240)) {
+      if (acceptable(hit.answer, evidence, sources, 220) && !uncitedRecord(hit.answer) && acceptable(hit.inspection, evidence, sources, 240)) {
         return { ...report, answer: hit.answer, decision: { ...report.decision, inspection: hit.inspection }, answerBy: 'ai' };
       }
     } catch { /* miss */ }
@@ -78,7 +87,8 @@ export async function writeProse(report: Report): Promise<Report> {
   const { value, source } = await llmJson<{ answer: string; inspection: string }>(SCHEMA, prompt,
     () => ({ answer: report.answer, inspection: report.decision.inspection }),
     { timeoutMs: Number(process.env.HC_WRITER_MS ?? 15_000), retries: 0, first: true, maxWaitMs: 10_000, validate: (v) => {
-      const why = rejectReason(v.answer, evidence, sources, 220) ?? rejectReason(v.inspection, evidence, sources, 240);
+      const uncited = uncitedRecord(v.answer);
+      const why = rejectReason(v.answer, evidence, sources, 220) ?? (uncited ? `uncited record: ${uncited}` : null) ?? rejectReason(v.inspection, evidence, sources, 240);
       if (why && process.env.HC_DEBUG) console.warn('[writer] rejected:', why, '|', v.answer, '|', v.inspection);
       return !why;
     } });

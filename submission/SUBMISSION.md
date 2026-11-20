@@ -89,7 +89,9 @@ FEMA NFHL, Resend, Vitest, Playwright (demo recording), ffmpeg.
 - Demo video: `submission/demo.mp4` in the repo (2:18, 1440×900). Upload it somewhere shareable for the form.
 - Screenshots: `submission/screenshots/` (1 verdict and tiles, 2 listing vs city, 3 specialist request
   confirm, 4 phone view).
-- Website: runs locally (`npm run build && npm run start`); the LLM is a local CLI, so there is no hosted deploy.
+- Website: https://house-checker-chi.vercel.app (real city data. On the hosted site the sentences are
+  rule-written, because the Claude Code CLI runs locally, and emails and specialist requests go to a demo outbox.
+  The full agent with Claude runs locally: `npm run build && npm run start`.)
 
 ## How to run
 ```
