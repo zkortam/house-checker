@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { ClaimRow, FindingLabel, Report, Source } from '../contract/types';
+import type { FindingLabel, PacketDoc, PacketFinding, Report, Source } from '../contract/types';
 import { checkCopy } from '../contract/copy';
 import { llmJson } from './llm';
 import { dataDir } from './store';
@@ -42,11 +42,6 @@ export async function loadPacket(id: string): Promise<{ pages: string[]; filenam
   if (!safeId(id)) return null;
   try { return JSON.parse(await readFile(path.join(packetDir(), `${id}.json`), 'utf8')); } catch { return null; }
 }
-
-/** Mirrors the PacketFinding / PacketSummary shape requested for src/contract (requests.md, 22:2xZ). */
-export type PacketDoc = 'inspection' | 'pest' | 'tds' | 'spq' | '3r' | 'nhd' | 'title' | 'hoa' | 'other';
-export interface PacketFindingOut { doc: PacketDoc; topic: PacketFact['topic']; statement: string; page: number; label: FindingLabel; records: string | null; text: string }
-export interface PacketSummaryOut { fileName: string | null; pages: number; findings: PacketFindingOut[] }
 
 /** Which document a page belongs to, from its own text. */
 export function docOf(page: string): PacketDoc {
@@ -118,16 +113,15 @@ export async function readPacketFacts(pages: string[]): Promise<PacketFact[]> {
   return value.facts.filter((f) => f.page >= 1 && f.page <= pages.length);
 }
 
-/** Reconcile packet facts against the report's ledger; returns new rows and sources to append. */
-export function reconcilePacket(report: Report, facts: PacketFact[], packetId: string, pages: string[] = []): { rows: ClaimRow[]; sources: Source[]; findings: PacketFindingOut[] } {
-  const rows: ClaimRow[] = [];
-  const findings: PacketFindingOut[] = [];
+/** Reconcile packet facts against the report's ledger; returns findings for report.packet and the page sources they cite. */
+export function reconcilePacket(report: Report, facts: PacketFact[], packetId: string, pages: string[] = []): { sources: Source[]; findings: PacketFinding[] } {
+  const findings: PacketFinding[] = [];
   const sources: Source[] = [];
   const base = report.sources.length;
   const cite = (page: number) => {
     const id = `packet:${packetId}:p${page}`;
     let i = sources.findIndex((s) => s.id === id);
-    if (i < 0) { const src: Source & { page: number } = { id, title: `Disclosure packet, page ${page}`, publisher: 'Seller disclosure', date: null, url: null, page }; sources.push(src); i = sources.length - 1; }
+    if (i < 0) { const src: Source = { id, title: `Disclosure packet, page ${page}`, publisher: 'Seller disclosure', date: null, url: null, page }; sources.push(src); i = sources.length - 1; }
     return `[${base + i + 1}]`;
   };
   const titles: Record<string, string> = { units: 'Units', baths: 'Baths', beds: 'Bedrooms', sqft: 'Sq ft' };
@@ -142,7 +136,6 @@ export function reconcilePacket(report: Report, facts: PacketFact[], packetId: s
     if (checkCopy(why).length) continue;
     const statement = f.statement.replace(/—/g, ',').slice(0, 90);
     if (!checkCopy(statement).length) findings.push({ doc: docOf(pages[f.page - 1] ?? ''), topic: f.topic, statement, page: f.page, label, records: ledger?.records ?? null, text: why });
-    rows.push({ key: 'other', title: `Packet: ${titles[f.topic].toLowerCase()}`, listing: val.slice(0, 14), records: ledger?.records ?? null, label, why });
   }
-  return { rows, sources, findings };
+  return { sources, findings };
 }

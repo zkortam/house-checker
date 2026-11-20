@@ -9,7 +9,7 @@ import { writeProse } from './writer';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
 import { readPermits } from './permit-reader';
-import { loadPacket, readPacketFacts, reconcilePacket, type PacketSummaryOut } from './packet';
+import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
 
 /**
  * The run: listing -> parcel -> parallel fetchers (each a live step) -> rules -> writer -> report.
@@ -114,7 +114,7 @@ async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extra
       const permitFacts = await readPermits(p.permits, (done, total) => {
         if (done === last || done >= total) return;
         last = done;
-        void emit(step('permits', 'running', { detail: `Read ${done} of ${total} permits` }));
+        void emit(step('permits', 'running', { detail: `Read ${done} of ${total} permits`, count: { done, total } }));
       });
       return { ...p, ...z, ...lin, permitFacts };
     }, (v) => { const open = v.permits.filter((p) => /issued|filed/i.test(p.status ?? '') && !p.completed_date).length; return open && open === v.permits.filter((p) => !/cancel|withdraw|expired/i.test(p.status ?? '')).length ? plural(open, 'open permit') : plural(v.permits.length, 'permit'); }, (v) => { Object.assign(raw, v); }),
@@ -129,7 +129,7 @@ async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extra
     }, (v) => { Object.assign(raw, v); }),
     run('planning', () => fetchers.planning(a), (v) => plural(v.planning.length + v.planningProjects.length, 'record'), (v) => { Object.assign(raw, v); }),
     run('tenants', () => fetchers.tenants(a), (v) => (v.buyouts.length || v.hotelTax.length ? [v.buyouts.length ? plural(v.buyouts.length, 'buyout') : '', v.hotelTax.length ? plural(v.hotelTax.length, 'hotel-tax registration') : ''].filter(Boolean).join(', ') : 'None found'), (v) => { Object.assign(raw, v); }),
-    run('hazards', () => fetchers.hazards(a), (h) => {
+    run('hazards', () => fetchers.hazards(a, (done, total) => { void emit(step('hazards', 'running', { detail: "Checking hazard maps", count: { done, total } })); }), (h) => {
       const notes = [h.femaZone && /^(A|V)/.test(h.femaZone), h.stormFlood, h.liquefaction, h.landslideZone || (h.landslideClass ?? 0) >= 7, h.tsunami, h.seaLevel, (h.reservoirs ?? []).length > 0, h.maher].filter(Boolean).length;
       return `8 maps, ${plural(notes, 'zone')}`;
     }, (v) => { raw.hazards = v; }),
@@ -145,12 +145,10 @@ async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extra
     } else {
       try {
         const facts = await readPacketFacts(packet.pages);
-        const { rows, sources, findings } = reconcilePacket(report, facts, opts.packetFileId, packet.pages);
-        const summary: PacketSummaryOut = { fileName: packet.filename ?? null, pages: packet.pages.length, findings };
-        const next: Report & { packet: PacketSummaryOut } = { ...report, ledger: [...report.ledger, ...rows], sources: [...report.sources, ...sources], packet: summary,
-          sections: { ...report.sections, packet: rows.length ? { state: 'ok' } : { state: 'empty', text: 'The packet states no counts to compare' } } };
-        report = next;
-        await emit(step('packet', 'done', { detail: `${packet.pages.length} pages, ${rows.length} claim${rows.length === 1 ? '' : 's'} compared` }));
+        const { sources, findings } = reconcilePacket(report, facts, opts.packetFileId, packet.pages);
+        report = { ...report, sources: [...report.sources, ...sources], packet: { fileName: packet.filename ?? null, pages: packet.pages.length, findings },
+          sections: { ...report.sections, packet: findings.length ? { state: 'ok' } : { state: 'empty', text: 'The packet states no counts to compare' } } };
+        await emit(step('packet', 'done', { detail: `${packet.pages.length} pages, ${findings.length} claim${findings.length === 1 ? '' : 's'} compared` }));
       } catch (e) {
         report.sections.packet = { state: 'error', source: 'Disclosure packet', retryable: true };
         await emit(step('packet', 'failed', { reason: "Couldn't read the disclosure packet", retryable: true }));

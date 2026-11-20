@@ -187,12 +187,14 @@ export const fetchers = {
     return { nearbyProjects, nearbyPermits: [], streetPermits: await street };
   },
 
-  async hazards(a: ResolvedAddress): Promise<Hazards> {
+  async hazards(a: ResolvedAddress, onProgress?: (done: number, total: number) => void): Promise<Hazards> {
     const empty: Hazards = { femaZone: null, femaSubtype: null, stormFlood: null, liquefaction: null, landslideZone: null, landslideClass: null, reservoirs: null, tsunami: null, seaLevel: null, maher: null };
     if (a.lat == null) return empty;
     const where = `intersects(the_geom,'${point(a)}')`;
     const arc = (base: string) => `${base}/query?geometry=${a.lon},${a.lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json`;
-    const opt = <T>(p: Promise<T>) => p.then((v) => v, () => null);
+    let settled = 0;
+    const tick = () => { settled++; if (settled < 9) onProgress?.(settled, 9); };
+    const opt = <T>(p: Promise<T>) => p.then((v) => { tick(); return v; }, () => { tick(); return null; });
     const [fema, storm, liq, slide, slideClass, res, tsu, slr, maher] = await Promise.all([
       opt(getJson<{ features?: Array<{ attributes: Record<string, string> }> }>(arc('https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28'), { label: 'hazards', timeoutMs: 12_000 })),
       opt(soql('jzu3-4yxp', { where, select: 'count(*) as n' }, { label: 'hazards', timeoutMs: 15_000 })),
