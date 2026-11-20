@@ -1,15 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import type { ApiError, Glyph, Report, StepEvent, StreamEvent } from '../contract/types';
-import { parseAddress, parcelDisplay, resolveAddress, type ResolvedAddress } from './address';
+import { parseAddress, parseAddressLoose, parcelDisplay, resolveAddress, type ResolvedAddress } from './address';
 import { readListing } from './listing';
 import { buildReport, fmtDate, type StepKey } from './rules';
 import { fetchers, type Raw } from './sources';
-import { saveReport } from './store';
+import { saveReport, trackRun } from './store';
 import { writeProse } from './writer';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
 import { readPermits } from './permit-reader';
-import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
+import { loadPacket, readPacketFacts, reconcilePacket, type PacketSummaryOut } from './packet';
 
 /**
  * The run: listing -> parcel -> parallel fetchers (each a live step) -> rules -> writer -> report.
@@ -56,7 +56,7 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   const listing = await readListing(listingText);
   if (!listing.ok) return fail({ kind: listing.kind, retryable: false, field: 'listingText' });
   const fromText = parseAddress(listingText);
-  const parsed = fromText && fromText.display === listing.claims.address ? fromText : listing.claims.address ? parseAddress(listing.claims.address) : null;
+  const parsed = fromText && fromText.display === listing.claims.address ? fromText : listing.claims.address ? parseAddressLoose(listing.claims.address) : null;
   if (!parsed) return fail({ kind: 'invalid', retryable: false, field: 'listingText', debug: 'no address in listing' });
 
   let addr: ResolvedAddress | null;
@@ -69,6 +69,19 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   if (!addr || !addr.parcels.length) return fail({ kind: 'not_found', retryable: false, field: 'listingText', debug: `no parcel for ${parsed.display}` });
 
   const reportId = opts.reportId ?? newReportId(addr.display);
+  let settle: (r: Report | null) => void = () => {};
+  if (opts.save !== false) trackRun(reportId, new Promise<Report | null>((r) => { settle = r; }));
+  try {
+    const report = await finishRun(reportId, addr, listing, listingText, emit, opts);
+    settle(report);
+    return report;
+  } catch (e) {
+    settle(null);
+    throw e;
+  }
+}
+
+async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extract<Awaited<ReturnType<typeof readListing>>, { ok: true }>, listingText: string, emit: Emit, opts: RunOpts): Promise<Report> {
   await emit({ type: 'run', runId: `run-${randomBytes(4).toString('hex')}`, reportId, address: addr.display });
 
   const packet = opts.packetFileId ? await loadPacket(opts.packetFileId) : null;
@@ -95,14 +108,15 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   await Promise.all([
     run('roll', () => fetchers.roll(a), (v) => (v[0]?.closed_roll_year ? `As of ${fmtDate(`${v[0].closed_roll_year}-01-01`)}` : 'No roll record'), (v) => { raw.roll = v; }),
     run('permits', async () => {
-      const [p, z] = await Promise.all([fetchers.permits(a), fetchers.zoning(a).catch(() => { failed.add('zoning'); return { zoning: [], historic: [] }; })]);
+      const [p, z, lin] = await Promise.all([fetchers.permits(a), fetchers.zoning(a).catch(() => { failed.add('zoning'); return { zoning: [], historic: [] }; }),
+        fetchers.lineage(a).catch(() => ({ lineage: [], parentPermits: [] }))]);
       let last = -1;
       const permitFacts = await readPermits(p.permits, (done, total) => {
         if (done === last || done >= total) return;
         last = done;
         void emit(step('permits', 'running', { detail: `Read ${done} of ${total} permits` }));
       });
-      return { ...p, ...z, permitFacts };
+      return { ...p, ...z, ...lin, permitFacts };
     }, (v) => { const open = v.permits.filter((p) => /issued|filed/i.test(p.status ?? '') && !p.completed_date).length; return open && open === v.permits.filter((p) => !/cancel|withdraw|expired/i.test(p.status ?? '')).length ? plural(open, 'open permit') : plural(v.permits.length, 'permit'); }, (v) => { Object.assign(raw, v); }),
     run('trade_permits', () => fetchers.trade(a), (v) => {
       const finals = v.plumbing.filter((p) => p.completed_date && /bath/i.test(p.description ?? '')).length;
@@ -131,9 +145,11 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
     } else {
       try {
         const facts = await readPacketFacts(packet.pages);
-        const { rows, sources } = reconcilePacket(report, facts, opts.packetFileId);
-        report = { ...report, ledger: [...report.ledger, ...rows], sources: [...report.sources, ...sources],
+        const { rows, sources, findings } = reconcilePacket(report, facts, opts.packetFileId, packet.pages);
+        const summary: PacketSummaryOut = { fileName: packet.filename ?? null, pages: packet.pages.length, findings };
+        const next: Report & { packet: PacketSummaryOut } = { ...report, ledger: [...report.ledger, ...rows], sources: [...report.sources, ...sources], packet: summary,
           sections: { ...report.sections, packet: rows.length ? { state: 'ok' } : { state: 'empty', text: 'The packet states no counts to compare' } } };
+        report = next;
         await emit(step('packet', 'done', { detail: `${packet.pages.length} pages, ${rows.length} claim${rows.length === 1 ? '' : 's'} compared` }));
       } catch (e) {
         report.sections.packet = { state: 'error', source: 'Disclosure packet', retryable: true };

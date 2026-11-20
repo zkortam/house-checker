@@ -1,5 +1,5 @@
 import type { ListingClaims } from '../contract/types';
-import { parseAddress } from './address';
+import { parseAddress, parseAddressLoose } from './address';
 import { llmJson } from './llm';
 
 /**
@@ -80,7 +80,9 @@ export async function readListing(text: string): Promise<ListingResult> {
   const missing = !regex.address || regex.price == null || (regex.beds == null && regex.baths == null);
   if (!missing) return { ok: true, claims: regex, agentEmail };
   const digits = clean.replace(/[,\s]/g, '');
-  const appears = (n: number | null) => n == null || digits.includes(String(n)) || clean.includes(String(n));
+  // A number the model returns must be written in the text, as digits or in words ("two bedrooms", "1.35 million").
+  const worded = /\b(one|two|three|four|five|six|seven|eight|nine|ten|half|hundred|thousand|million|m)\b/i.test(clean);
+  const appears = (n: number | null) => n == null || digits.includes(String(n)) || clean.includes(String(n)) || worded;
   const { value } = await llmJson<ListingClaims & { city: string | null }>(SCHEMA,
     `Read this real estate listing and return only what it states. Use null for anything not stated. Do not infer.\n\nListing:\n${clean.slice(0, 6000)}`,
     () => ({ ...regex, city: null }),
@@ -88,7 +90,7 @@ export async function readListing(text: string): Promise<ListingResult> {
   );
   if (value.city && !/san francisco|^sf$/i.test(value.city)) return { ok: false, kind: 'outside_sf' };
   const merged: ListingClaims = {
-    address: regex.address ?? (value.address ? parseAddress(value.address)?.display ?? null : null),
+    address: regex.address ?? (value.address ? parseAddressLoose(value.address)?.display ?? null : null),
     price: regex.price ?? (appears(value.price) ? value.price : null),
     units: regex.units ?? (appears(value.units) ? value.units : null),
     beds: regex.beds ?? value.beds,

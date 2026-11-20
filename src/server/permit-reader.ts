@@ -66,23 +66,34 @@ export function regexFacts(p: Row): PermitFacts {
   };
 }
 
-/** Tags every permit; the model only for permits not cached yet, the regex for the rest or on failure. */
-export async function readPermits(permits: Row[], onProgress?: (done: number, total: number) => void): Promise<Map<string, PermitFacts>> {
+/**
+ * Tags every permit. The model reads only the newest uncached permits (at most 20, batches in parallel) within a
+ * time budget, so a 400-unit building never waits on it; everything else gets the regex tags.
+ */
+export async function readPermits(permits: Row[], onProgress?: (done: number, total: number) => void, budgetMs = Number(process.env.HC_PERMIT_READER_MS ?? 10_000)): Promise<Map<string, PermitFacts>> {
   const out = new Map<string, PermitFacts>();
   const known = await cache();
-  const todo = permits.filter((p) => p.permit_number && p.description && !known[p.permit_number]).slice(0, 60);
   for (const p of permits) if (p.permit_number && known[p.permit_number]) out.set(p.permit_number, known[p.permit_number]);
+  // The newest 20 permits overall; once they are cached, no model call at all.
+  const todo = permits.filter((p) => p.permit_number && p.description)
+    .sort((a, b) => (b.filed_date ?? '').localeCompare(a.filed_date ?? '')).slice(0, 20)
+    .filter((p) => !known[p.permit_number!]);
   onProgress?.(out.size, permits.length);
-  for (let i = 0; i < todo.length; i += 20) {
-    const batch = todo.slice(i, i + 20);
+  const batches: Row[][] = [];
+  for (let i = 0; i < todo.length; i += 10) batches.push(todo.slice(i, i + 10));
+  const work = Promise.all(batches.map(async (batch) => {
     const { value, source } = await llmJson<{ permits: PermitFacts[] }>(SCHEMA,
       `Tag each San Francisco building permit by its description only. addsBaths: number of bathrooms added (not remodeled in kind), else null. unitChange: +n units added or -n removed, else null.\n\n${batch.map((p) => `${p.permit_number}: ${(p.description ?? '').slice(0, 400)}`).join('\n')}`,
       () => ({ permits: batch.map(regexFacts) }),
-      { timeoutMs: 40_000, retries: 0, validate: (v) => Array.isArray(v.permits) && v.permits.every((f) => batch.some((b) => b.permit_number === f.permit)) });
+      { timeoutMs: Math.max(budgetMs, 45_000), retries: 0, validate: (v) => Array.isArray(v.permits) && v.permits.every((f) => batch.some((b) => b.permit_number === f.permit)) });
     for (const f of value.permits) { out.set(f.permit, f); if (source === 'model') known[f.permit] = f; }
     onProgress?.(Math.min(out.size, permits.length), permits.length);
-  }
-  for (const p of permits) if (p.permit_number && !out.has(p.permit_number)) out.set(p.permit_number, regexFacts(p));
-  try { await mkdir(path.dirname(file()), { recursive: true }); await writeFile(file(), JSON.stringify(known)); } catch { /* best effort */ }
-  return out;
+  }));
+  const save = async () => { try { await mkdir(path.dirname(file()), { recursive: true }); await writeFile(file(), JSON.stringify(known)); } catch { /* best effort */ } };
+  // Batches that finish after the budget still land in the cache, so the next check of this building is instant.
+  void work.then(save, () => undefined);
+  await Promise.race([work, new Promise((r) => setTimeout(r, budgetMs + 500))]);
+  const result = new Map(out);
+  for (const p of permits) if (p.permit_number && !result.has(p.permit_number)) result.set(p.permit_number, regexFacts(p));
+  return result;
 }

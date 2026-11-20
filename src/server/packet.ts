@@ -30,6 +30,7 @@ export async function storePacket(bytes: Uint8Array, filename = 'packet.pdf'): P
   try {
     const { stdout } = await run('pdftotext', ['-layout', '-enc', 'UTF-8', pdf, '-'], { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
     const pages = stdout.split('\f').map((t) => t.trim());
+    if (pages.length > 1 && pages[pages.length - 1] === '') pages.pop(); // pdftotext ends every page with a form feed
     await writeFile(path.join(packetDir(), `${id}.json`), JSON.stringify({ id, filename: filename.slice(0, 200), at: new Date().toISOString(), pages }));
   } catch (e) {
     return { error: 'unavailable', debug: `pdftotext failed: ${(e as Error).message}` };
@@ -40,6 +41,25 @@ export async function storePacket(bytes: Uint8Array, filename = 'packet.pdf'): P
 export async function loadPacket(id: string): Promise<{ pages: string[]; filename: string } | null> {
   if (!safeId(id)) return null;
   try { return JSON.parse(await readFile(path.join(packetDir(), `${id}.json`), 'utf8')); } catch { return null; }
+}
+
+/** Mirrors the PacketFinding / PacketSummary shape requested for src/contract (requests.md, 22:2xZ). */
+export type PacketDoc = 'inspection' | 'pest' | 'tds' | 'spq' | '3r' | 'nhd' | 'title' | 'hoa' | 'other';
+export interface PacketFindingOut { doc: PacketDoc; topic: PacketFact['topic']; statement: string; page: number; label: FindingLabel; records: string | null; text: string }
+export interface PacketSummaryOut { fileName: string | null; pages: number; findings: PacketFindingOut[] }
+
+/** Which document a page belongs to, from its own text. */
+export function docOf(page: string): PacketDoc {
+  const t = page.toLowerCase();
+  if (/transfer disclosure statement|\btds\b/.test(t)) return 'tds';
+  if (/seller property questionnaire|\bspq\b/.test(t)) return 'spq';
+  if (/report of residential (building )?record|\b3r\b/.test(t)) return '3r';
+  if (/natural hazard disclosure|\bnhd\b/.test(t)) return 'nhd';
+  if (/preliminary (title )?report|title insurance/.test(t)) return 'title';
+  if (/wood destroying|termite|pest control|section 1/.test(t)) return 'pest';
+  if (/homeowners'? association|\bhoa\b|cc&rs/.test(t)) return 'hoa';
+  if (/inspection/.test(t)) return 'inspection';
+  return 'other';
 }
 
 export interface PacketFact { topic: 'units' | 'baths' | 'beds' | 'sqft' | 'roof' | 'foundation' | 'permits' | 'other'; statement: string; value: number | null; page: number }
@@ -99,14 +119,15 @@ export async function readPacketFacts(pages: string[]): Promise<PacketFact[]> {
 }
 
 /** Reconcile packet facts against the report's ledger; returns new rows and sources to append. */
-export function reconcilePacket(report: Report, facts: PacketFact[], packetId: string): { rows: ClaimRow[]; sources: Source[] } {
+export function reconcilePacket(report: Report, facts: PacketFact[], packetId: string, pages: string[] = []): { rows: ClaimRow[]; sources: Source[]; findings: PacketFindingOut[] } {
   const rows: ClaimRow[] = [];
+  const findings: PacketFindingOut[] = [];
   const sources: Source[] = [];
   const base = report.sources.length;
   const cite = (page: number) => {
     const id = `packet:${packetId}:p${page}`;
     let i = sources.findIndex((s) => s.id === id);
-    if (i < 0) { sources.push({ id, title: `Disclosure packet, page ${page}`, publisher: 'Seller disclosure', date: null, url: null }); i = sources.length - 1; }
+    if (i < 0) { const src: Source & { page: number } = { id, title: `Disclosure packet, page ${page}`, publisher: 'Seller disclosure', date: null, url: null, page }; sources.push(src); i = sources.length - 1; }
     return `[${base + i + 1}]`;
   };
   const titles: Record<string, string> = { units: 'Units', baths: 'Baths', beds: 'Bedrooms', sqft: 'Sq ft' };
@@ -119,7 +140,9 @@ export function reconcilePacket(report: Report, facts: PacketFact[], packetId: s
     if (recNum != null && Number.isFinite(recNum) && recNum > 0) label = (f.topic === 'sqft' ? Math.abs(recNum - f.value) / recNum <= 0.1 : recNum === f.value) ? 'matches' : 'records_differ';
     const why = `The packet states ${f.statement.replace(/[.!]+$/, '').replace(/—/g, ',')} ${cite(f.page)}.${ledger ? ` City records show ${ledger.records ?? 'nothing on this'}${ledger.why.match(/\[\d+\]/)?.[0] ? ' ' + ledger.why.match(/\[\d+\]/)![0] : ''}.` : ''}`;
     if (checkCopy(why).length) continue;
+    const statement = f.statement.replace(/—/g, ',').slice(0, 90);
+    if (!checkCopy(statement).length) findings.push({ doc: docOf(pages[f.page - 1] ?? ''), topic: f.topic, statement, page: f.page, label, records: ledger?.records ?? null, text: why });
     rows.push({ key: 'other', title: `Packet: ${titles[f.topic].toLowerCase()}`, listing: val.slice(0, 14), records: ledger?.records ?? null, label, why });
   }
-  return { rows, sources };
+  return { rows, sources, findings };
 }

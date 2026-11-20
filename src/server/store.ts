@@ -60,3 +60,23 @@ export async function idempotent<T>(scope: string, key: string, run: () => Promi
   locks.set(file, p);
   try { return await p; } finally { locks.delete(file); }
 }
+
+/* In-flight runs, shared across route bundles in one server process, so a refresh mid-stream gets the report. */
+type Inflight = Map<string, Promise<Report | null>>;
+const g = globalThis as unknown as { __hcInflight?: Inflight };
+const inflight: Inflight = (g.__hcInflight ??= new Map());
+
+export function trackRun(id: string, p: Promise<Report | null>): void {
+  inflight.set(id, p);
+  p.finally(() => { if (inflight.get(id) === p) inflight.delete(id); }).catch(() => undefined);
+}
+
+/** The stored report, or, when the run is still going, the report once it finishes (up to waitMs). */
+export async function getReportOrWait(id: string, waitMs = 90_000): Promise<Report | null> {
+  const stored = await getReport(id);
+  if (stored) return stored;
+  const run = inflight.get(id);
+  if (!run) return null;
+  const done = await Promise.race([run.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), waitMs))]);
+  return done ?? (await getReport(id));
+}

@@ -24,6 +24,10 @@ describe('disclosure packet (A12)', () => {
     expect(baths).toMatchObject({ listing: '3', records: '4', label: 'records_differ' });
     expect(report!.sources.some((s) => /^packet:pk-[a-f0-9]+:p1$/.test(s.id))).toBe(true);
     expect(report!.sections.packet).toEqual({ state: 'ok' });
+    const summary = (report as unknown as { packet: { pages: number; findings: Array<{ doc: string; topic: string; page: number; label: string }> } }).packet;
+    expect(summary.pages).toBe(2);
+    expect(summary.findings.find((f) => f.topic === 'baths')).toMatchObject({ doc: 'spq', page: 1, label: 'records_differ' });
+    expect(summary.findings.find((f) => f.topic === 'sqft')).toMatchObject({ doc: 'inspection', page: 2, label: 'matches' });
     for (const r of rows) { expect(checkCopy(r.why)).toEqual([]); expect(checkCitations(r.why, report!.sources.length)).toEqual([]); }
   });
 

@@ -59,3 +59,18 @@ describe('Senso sponsor (A13)', () => {
     expect(ctx.text).not.toMatch(/undefined/);
   });
 });
+
+describe('refresh mid-run', () => {
+  it('GET waits for an in-flight run instead of returning not_found', async () => {
+    const { runCheck } = await import('../../src/server/pipeline');
+    const { getReportOrWait, getReport } = await import('../../src/server/store');
+    let id = '';
+    const done = runCheck(DEMO_LISTINGS[5].text, (e) => { if (e.type === 'run') id = e.reportId; }, { now: new Date('2026-11-20T22:00:00Z') });
+    while (!id) await new Promise((r) => setTimeout(r, 1));
+    const waited = getReportOrWait(id, 10_000);
+    await done;
+    expect((await waited)?.id).toBe(id);
+    expect((await getReport(id))?.id).toBe(id);
+    expect(await getReportOrWait('nope', 10)).toBeNull();
+  });
+});
