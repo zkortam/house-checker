@@ -25,7 +25,8 @@ export function readListingRegex(text: string): ListingClaims {
   const t = text.replace(/ /g, ' ');
   const addr = parseAddress(t);
   let price: number | null = null;
-  const pm = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i) ?? t.match(/\$\s?([\d,.]+)\s*(m|million|k)?\b/i);
+  const pm = t.match(/(?:offered at|list(?:ed)? (?:price|at)|asking|price[d]?(?: at)?:?)\s*\$\s?([\d,.]+)\s*(m|million|k)?/i) ?? t.match(/\$\s?([\d,.]+)\s*(m|million|k)?\b/i)
+    ?? t.match(/(?:offered at|asking|list price|priced at)\s*([\d,.]+)\s*(m|million|k)\b/i); // "asking 799k", no dollar sign
   if (pm) {
     const base = num(pm[1]);
     const mult = pm[2] ? (/^m/i.test(pm[2]) ? 1_000_000 : 1_000) : 1;
