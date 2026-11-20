@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { dataDir } from './store';
 
 /**
  * One HTTP layer for every city source: timeout, one jittered retry, a 24 h file cache under .data/cache,
@@ -16,7 +17,7 @@ export class FetchError extends Error {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-function cacheDir(): string { return process.env.HC_CACHE_DIR ?? path.join(process.cwd(), '.data', 'cache'); }
+function cacheDir(): string { return process.env.HC_CACHE_DIR ?? path.join(dataDir(), 'cache'); }
 function key(url: string): string { return createHash('sha1').update(url).digest('hex').slice(0, 20); }
 
 async function readJsonFile(file: string): Promise<unknown | undefined> {
@@ -73,8 +74,9 @@ export async function getJson<T = unknown>(url: string, opts: GetOpts = {}): Pro
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { accept: 'application/json', ...token } });
       if (!res.ok) { lastErr = new FetchError(`HTTP ${res.status}`, 'unavailable', url); if (res.status < 500 && res.status !== 429) break; continue; }
       const body = await res.json();
-      await writeJsonFile(cacheDir(), url, body);
-      await record(url, body);
+      // Caching and recording are best effort: a read-only disk must never turn a good response into a failure.
+      await writeJsonFile(cacheDir(), url, body).catch(() => undefined);
+      await Promise.resolve(record(url, body)).catch(() => undefined);
       return body as T;
     } catch (e) {
       lastErr = e instanceof FetchError ? e : new FetchError(String((e as Error)?.message ?? e), (e as Error)?.name === 'TimeoutError' ? 'timeout' : 'unavailable', url);
