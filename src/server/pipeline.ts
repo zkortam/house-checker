@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { ApiError, Glyph, Report, StepEvent, StreamEvent } from '../contract/types';
-import { parseAddress, parcelDisplay, resolveAddress, type ResolvedAddress } from './address';
+import { parseAddress, parseAddressLoose, parcelDisplay, resolveAddress, type ResolvedAddress } from './address';
 import { readListing } from './listing';
 import { buildReport, fmtDate, type StepKey } from './rules';
 import { fetchers, type Raw } from './sources';
@@ -56,7 +56,7 @@ export async function runCheck(listingText: string, emit: Emit, opts: RunOpts = 
   const listing = await readListing(listingText);
   if (!listing.ok) return fail({ kind: listing.kind, retryable: false, field: 'listingText' });
   const fromText = parseAddress(listingText);
-  const parsed = fromText && fromText.display === listing.claims.address ? fromText : listing.claims.address ? parseAddress(listing.claims.address) : null;
+  const parsed = fromText && fromText.display === listing.claims.address ? fromText : listing.claims.address ? parseAddressLoose(listing.claims.address) : null;
   if (!parsed) return fail({ kind: 'invalid', retryable: false, field: 'listingText', debug: 'no address in listing' });
 
   let addr: ResolvedAddress | null;

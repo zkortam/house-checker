@@ -32,3 +32,12 @@ describe('unit numbers', () => {
     expect(parseAddress('2055 42nd Ave, San Francisco')).toMatchObject({ unit: null });
   });
 });
+
+describe('loose addresses from the model', () => {
+  it('accepts a number and street name without a type', async () => {
+    const { parseAddressLoose } = await import('../../src/server/address');
+    expect(parseAddressLoose('1200 Cole')).toMatchObject({ number: '1200', street: 'COLE', type: null });
+    expect(parseAddressLoose('1200 Cole Street')).toMatchObject({ street: 'COLE', type: 'ST' });
+    expect(parseAddressLoose('Cole Street')).toBeNull();
+  });
+});
