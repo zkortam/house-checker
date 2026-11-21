@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { FIXTURES } from '@contract/fixtures';
 import { S, fill } from '../strings.en';
-import { Button, FileAttach, IconButton, Textarea } from '../components/ui';
+import { Button, FileAttach, IconButton, Pressable, Textarea } from '../components/ui';
 import { uploadPacket } from '../api';
 import { startRun } from '../lib/run-store';
 import { useTabTitle } from '../lib/tab-title';
@@ -111,7 +111,7 @@ export function StartScreen() {
             {error && suggest.length ? (
               <span className="suggest">
                 {S.closestOnRecord}
-                {suggest.map((a) => <button key={a} type="button" className="pill" onClick={() => { const v = `${a}, San Francisco`; setText(v); run(v); }}>{a}</button>)}
+                {suggest.map((a) => <Pressable key={a} className="pill" onClick={() => { const v = `${a}, San Francisco`; setText(v); run(v); }}>{a}</Pressable>)}
               </span>
             ) : null}
           </div>
