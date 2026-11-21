@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { SettingsDialog } from './SettingsDialog';
 import { S } from '../strings.en';
 import { U } from '../icons';
-import { ToastDock, useToast } from './ui';
+import { Pressable, ToastDock, useToast } from './ui';
 
 /** Places: a rail from 744 px, a tab pill below it (Surf Studio shell). Settings holds theme, text size and motion. */
 const PLACES = [
@@ -30,11 +30,11 @@ function Places({ kind }: { kind: 'rail' | 'tabs' }) {
           );
         })}
         {kind === 'tabs' ? (
-          <li><button type="button" className="place" onClick={() => setOpen(true)}><U name="settings" /><span>{S.navSettings}</span></button></li>
+          <li><Pressable className="place" onClick={() => setOpen(true)}><U name="settings" /><span>{S.navSettings}</span></Pressable></li>
         ) : null}
       </ul>
       {kind === 'rail' ? (
-        <button type="button" className="place" onClick={() => setOpen(true)}><U name="settings" /><span>{S.navSettings}</span></button>
+        <Pressable className="place" onClick={() => setOpen(true)}><U name="settings" /><span>{S.navSettings}</span></Pressable>
       ) : null}
       <SettingsDialog open={open} onClose={() => setOpen(false)} />
     </nav>
@@ -50,7 +50,7 @@ export function ShareButton() {
     }
     try { await navigator.clipboard.writeText(url); toast.show(S.linkCopied); } catch { toast.show(S.linkNotCopied, { error: true }); }
   };
-  return <button type="button" className="pill" onClick={share}>{S.share}</button>;
+  return <Pressable className="pill" onClick={share}>{S.share}</Pressable>;
 }
 
 /** `back`, `title` and `share` are accepted for older callers; the rail replaces the header that used them. */

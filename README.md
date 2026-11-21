@@ -39,16 +39,19 @@ npm run typecheck && npm test  # 54 tests, offline (recorded city data)
 node scripts/demo-check.mjs    # headless demo against a running server
 ```
 
-Requirements: Node 24, and the Claude Code CLI logged in on this machine (`claude`). There is no Anthropic API
-key: the server spawns `claude -p --output-format json --json-schema ...` for listing parsing, permit reading and
-the short answer, and falls back to rule-written sentences when the CLI is missing or fails.
+Requirements: Node 24, plus one way to reach Claude. Without `ANTHROPIC_API_KEY`, the server spawns the local
+Claude Code CLI (`claude -p --output-format json --json-schema ...`) for listing parsing, permit reading and the
+short answer. With `ANTHROPIC_API_KEY` set, it calls the Claude API instead (`HC_MODEL`, default
+`claude-haiku-5-5`). Either way it falls back to rule-written sentences when Claude is unavailable, and
+`HC_LLM=off` turns Claude off entirely.
 
 ## Environment
 
 | Variable | Default | What it does |
 |---|---|---|
 | `NEXT_PUBLIC_MOCK` | `0` | `1` replays the two golden fixtures in the UI with no server calls |
-| `CLAUDE_BIN` | `claude` | Path to the Claude Code CLI |
+| `CLAUDE_BIN` | `claude` | Path to the Claude Code CLI (used when `ANTHROPIC_API_KEY` is unset) |
+| `ANTHROPIC_API_KEY`, `HC_MODEL` | unset, `claude-haiku-5-5` | Use the Claude API instead of the CLI (the hosted site does) |
 | `HC_LLM` | `on` | `off` skips the CLI entirely (template sentences, regex parsing) |
 | `HC_DEMO_RECORDINGS` | `0` | `1` serves recorded DataSF responses for the 6 demo addresses first (fast, works offline) |
 | `HC_FETCH_TIMEOUT_MS` | `10000` | Per-request timeout for city data; one retry; stale cache beats a failure |
@@ -71,10 +74,9 @@ Demo video: [submission/demo.mp4](submission/demo.mp4) (2:01). Submission answer
 
 ## Live demo
 
-Hosted: https://house-checker-chi.vercel.app (Vercel). It runs on real city data, with demo addresses served from
-recordings. Sentences there are written by the rule templates (`HC_LLM=off`, since the Claude Code CLI only runs
-locally), reports live in a private Vercel Blob store, and emails go to a demo outbox. The full agent, with Claude
-writing the short answer and reading permits, runs locally:
+Hosted: https://house-checker-chi.vercel.app (Vercel). Every check there runs live against city data, and Claude
+is reached through the Claude API (Haiku 5.5, key held in Vercel's encrypted env). Reports live in a private Vercel
+Blob store, and emails go to a demo outbox. To run it locally:
 
 1. `npm run build && npm run start` with `.env.local` holding `NEXT_PUBLIC_MOCK=0` and `HC_DEMO_RECORDINGS=1`
    (recorded city data for the 6 demo addresses, so DataSF latency can't stall the demo).

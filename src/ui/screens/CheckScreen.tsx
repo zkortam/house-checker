@@ -15,6 +15,7 @@ import { Verdict, stepsSummary } from '../report/sections';
 import { Hero } from '../report/ReportView';
 import { SourceSheet } from '../report/actions';
 import { AppShell } from '../components/AppShell';
+import { useTabTitle } from '../lib/tab-title';
 import { track } from '../analytics';
 
 function lastRunId(): string | null {
@@ -44,7 +45,7 @@ export function CheckScreen({ id }: { id: string }) {
   const report = live?.report ?? (live ? null : fetched);
   const address = report?.address ?? live?.address ?? null;
 
-  useEffect(() => { document.title = fill(S.tabTitle, { page: address ?? S.stepsTitle }); }, [address]);
+  useTabTitle(fill(S.tabTitle, { page: address ?? S.stepsTitle }));
   useEffect(() => { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; }, []);
 
   const retry = useCallback(async () => {

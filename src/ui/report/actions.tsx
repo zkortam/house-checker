@@ -162,6 +162,7 @@ export function BookFlow({ report, unknown, onClose, onSent }: {
               <span>{fill(S.bookConfirmScope, { value: offer.scope })}</span>
               <MetaLine items={[offer.priceUsd != null ? fill(S.bookConfirmPrice, { value: money(offer.priceUsd) }) : S.bookConfirmPriceUnknown, S.noPaidPlacement]} />
             </div>
+            {offer.slots.length ? <p className="row-sub">{S.bookTimesNote}</p> : null}
             {offer.slots.length ? (
               <div className="slot-list" role="radiogroup" aria-label={S.bookTimes}>
                 {offer.slots.map((s) => (

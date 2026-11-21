@@ -8,9 +8,11 @@ const usdCompact = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 
 const num = new Intl.NumberFormat(LOCALE);
 const dayFmt = new Intl.DateTimeFormat(LOCALE, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const monthFmt = new Intl.DateTimeFormat(LOCALE, { month: 'short', year: 'numeric', timeZone: 'UTC' });
-const slotFmt = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-const slotDay = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', month: 'short', day: 'numeric' });
-const slotTime = new Intl.DateTimeFormat(LOCALE, { hour: 'numeric', minute: '2-digit' });
+/** Visits happen at the house, so times are San Francisco time wherever the reader is (the email says Pacific too). */
+const SF_TZ = 'America/Los_Angeles';
+const slotFmt = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SF_TZ });
+const slotDay = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', timeZone: SF_TZ });
+const slotTime = new Intl.DateTimeFormat(LOCALE, { hour: 'numeric', minute: '2-digit', timeZone: SF_TZ });
 
 export function money(n: number | null | undefined): string { return n == null ? EMPTY_VALUE : usd.format(n); }
 export function moneyCompact(n: number): string { return usdCompact.format(n); }
