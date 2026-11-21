@@ -1,4 +1,5 @@
 import type { ActionLogEntry, Report } from '../../contract/types';
+import { after } from 'next/server';
 
 /**
  * A13 sponsor: Senso.ai context layer. When SENSO_API_KEY is set, each finished report's cited sources, findings
@@ -48,6 +49,7 @@ export async function pushToSenso(report: Report): Promise<void> {
   }
 }
 
-/** Fire and forget: never awaited on the request path. */
-export function sensoAfterReport(report: Report): void { if (sensoEnabled()) void pushToSenso(report); }
-export function sensoAfterAction(report: Report | null, _entry: ActionLogEntry): void { if (report && sensoEnabled()) void pushToSenso(report); }
+/** Never awaited on the request path. after() keeps a serverless function alive until the push ends; outside a request (scripts, tests) it runs detached. */
+function later(fn: () => Promise<void>): void { try { after(fn); } catch { void fn(); } }
+export function sensoAfterReport(report: Report): void { if (sensoEnabled()) later(() => pushToSenso(report)); }
+export function sensoAfterAction(report: Report | null, _entry: ActionLogEntry): void { if (report && sensoEnabled()) later(() => pushToSenso(report)); }
