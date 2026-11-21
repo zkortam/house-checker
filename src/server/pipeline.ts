@@ -9,6 +9,7 @@ import { writeProse } from './writer';
 import { applyPolish, polishText } from './polish';
 import { FetchError } from './http';
 import { sensoAfterReport } from './sponsors/senso';
+import { cogneeAfterReport } from './sponsors/cognee';
 import { readPermits } from './permit-reader';
 import { loadPacket, readPacketFacts, reconcilePacket } from './packet';
 
@@ -168,7 +169,7 @@ async function finishRun(reportId: string, addr: ResolvedAddress, listing: Extra
   if (polishing) report = applyPolish(report, await polishing);
   for (const word of report.answer.split(/(?<= )/)) await emit({ type: 'delta', text: word });
   if (opts.save !== false) await saveReport(report);
-  if (opts.save !== false) sensoAfterReport(report);
+  if (opts.save !== false) { sensoAfterReport(report); cogneeAfterReport(report); }
   await emit({ type: 'report', report });
   await emit({ type: 'done' });
   return report;

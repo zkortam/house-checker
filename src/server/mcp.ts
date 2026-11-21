@@ -2,6 +2,7 @@ import type { ApiError, Report, StreamEvent } from '../contract/types';
 import { LABELS, HAZARD_STATUS } from '../contract/labels';
 import { runCheck } from './pipeline';
 import { getReportOrWait } from './store';
+import { askHomes, cogneeEnabled } from './sponsors/cognee';
 
 /**
  * House Checker as an MCP server (Streamable HTTP, stateless, JSON responses). Any MCP client (Grok through the
@@ -18,6 +19,17 @@ export const INSTRUCTIONS = [
   'Numbers in brackets like [3] cite the numbered sources at the end of the report; quote them when you pass findings on.',
   'It is not an inspection, appraisal or legal advice. It has no crime, school or demographic data by design.',
 ].join(' ');
+
+const ASK_TOOL = {
+  name: 'ask_checked_homes',
+  title: 'Ask across checked homes',
+  description: 'Ask a question across every San Francisco home House Checker has checked, answered from a Cognee knowledge graph of the reports (for example "Which homes had open city cases?" or "Which ones are in a landslide zone?"). Covers homes already checked; use check_home for a new one.',
+  inputSchema: { type: 'object', properties: { question: { type: 'string', description: 'The question' } }, required: ['question'] },
+  annotations: { title: 'Ask across checked homes', readOnlyHint: true, openWorldHint: false },
+};
+
+/** Tools on offer now: ask_checked_homes only when Cognee is configured. */
+export const tools = () => (cogneeEnabled() ? [...TOOLS, ASK_TOOL] : TOOLS);
 
 export const TOOLS = [
   {
@@ -125,6 +137,16 @@ export async function callTool(name: string, args: Record<string, unknown>, base
     const id = typeof args.id === 'string' ? args.id.trim() : '';
     const report = id ? await getReportOrWait(id) : null;
     return report ? text(reportMarkdown(report, base)) : text('No report with that id. Run check_home again.', true);
+  }
+  if (name === 'ask_checked_homes' && cogneeEnabled()) {
+    const question = typeof args.question === 'string' ? args.question.trim().slice(0, 1000) : '';
+    if (!question) return text('Ask a question, like "Which homes had open city cases?"', true);
+    try {
+      const answer = await askHomes(question);
+      return text(answer || 'No answer yet. Reports take a minute to be added after a check.');
+    } catch {
+      return text('The memory of checked homes is not available right now. Try again in a minute.', true);
+    }
   }
   throw Object.assign(new Error(`Unknown tool: ${name}`), { code: -32602 });
 }

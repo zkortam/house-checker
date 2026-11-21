@@ -1,4 +1,4 @@
-import { INSTRUCTIONS, PROTOCOL_VERSIONS, SERVER_INFO, TOOLS, callTool } from '@/server/mcp';
+import { INSTRUCTIONS, PROTOCOL_VERSIONS, SERVER_INFO, callTool, tools } from '@/server/mcp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,7 +29,7 @@ async function handle(msg: Rpc, base: string): Promise<object | null> {
       });
     }
     case 'ping': return ok(msg.id, {});
-    case 'tools/list': return ok(msg.id, { tools: TOOLS });
+    case 'tools/list': return ok(msg.id, { tools: tools() });
     case 'tools/call': {
       const name = String(msg.params?.name ?? '');
       const args = (msg.params?.arguments ?? {}) as Record<string, unknown>;

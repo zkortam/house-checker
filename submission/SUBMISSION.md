@@ -77,14 +77,16 @@ Claude API (Claude Haiku 5.5), Claude Code, Next.js 16, React 19, TypeScript, Ph
 FEMA NFHL, Resend, Vitest, Playwright (demo recording), ffmpeg.
 
 ## Sponsor tools
-- **Senso.ai** (context layer): each finished report's findings, sources and action log are pushed to Senso
-  as trusted context (`src/server/sponsors/senso.ts`). Env-gated by `SENSO_API_KEY`; not active in the
-  recorded demo because no key was available.
-- **Amplitude**: product events (check started, report shown, tile tapped, source opened, email sent,
-  specialist requested; no addresses or text) from `src/ui/analytics.ts`. Env-gated by
-  `NEXT_PUBLIC_AMPLITUDE_API_KEY`; not active in the recorded demo.
-- Suggested tracks: Senso "Best Use of Senso" (shopping agent with trusted context) once a key is set, and
-  Guild AI "Most Interesting Use of Agents".
+- **Senso.ai** (context layer), live on the hosted site: each finished report's findings, sources and action
+  log are pushed to Senso as trusted context, and pushed again after every action (`src/server/sponsors/senso.ts`).
+- **Amplitude**, live on the hosted site: product events (check started, report shown, tile tapped, source
+  opened, email sent, specialist requested; no addresses or text) from `src/ui/analytics.ts`.
+- **Cognee** (memory): every report is added to a Cognee dataset and cognified into a knowledge graph; the
+  `ask_checked_homes` MCP tool answers questions across every home checked (`src/server/sponsors/cognee.ts`).
+  Env-gated by `COGNEE_API_KEY` and `COGNEE_BASE_URL`.
+- Suggested tracks: Senso "Best Use of Senso", Amplitude "Best Use of Amplitude", Cognee, and Guild AI
+  "Most Interesting Use of Agents".
+- The recorded demo video predates these keys.
 
 ## Team
 - Names and contact emails: **to be filled in by the team** (not included here on purpose).
