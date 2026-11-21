@@ -43,6 +43,9 @@ out days later, after records requests, or never. (Reproducible scripts in `rese
    and every source one tap away.
 4. "Ask before you offer": unknowns grouped by who can answer, one action per group, each with Undo or a
    confirm step, all logged.
+5. Other agents can use it too: an MCP endpoint (`POST https://house-checker-chi.vercel.app/api/mcp`, tools
+   `check_home` and `get_report`) returns the same report as Markdown with numbered sources, so Claude, Grok or
+   any MCP client can check a home.
 
 Two real examples (real city records; the listing text is an example):
 - **2055 42nd Ave**: the assessor says 1 unit and 1 bath. Permits show the in-law was legalized in 2025 and
