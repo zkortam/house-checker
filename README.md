@@ -56,6 +56,8 @@ the short answer, and falls back to rule-written sentences when the CLI is missi
 | `BUYER_EMAIL`, `SPECIALIST_EMAIL` | unset, `specialist@example.com` | Copy and reply-to for the buyer; where specialist requests (with an `.ics` invite) go |
 | `SENSO_API_KEY`, `SENSO_BASE_URL` | unset | Sponsor: push each report's sources and action log to Senso's context layer |
 | `NEXT_PUBLIC_AMPLITUDE_API_KEY` | unset | Sponsor: product events from the UI, no addresses or text |
+| `ANTHROPIC_API_KEY`, `HC_MODEL` | unset | Claude through the API (default `claude-haiku-5-5`); without a key, the local Claude Code CLI |
+| `HC_MCP_TOKEN` | unset | When set, the MCP endpoint `/api/mcp` requires `Authorization: Bearer <token>` |
 
 Data lives in `.data/` (reports, 24 h cache, outbox, idempotency keys). It is gitignored.
 
@@ -96,6 +98,23 @@ writing the short answer and reading permits, runs locally:
 - Demo mode: without Resend keys, emails land in `.data/outbox/`. The specialist is a placeholder address.
   Senso and Amplitude are wired but off without keys.
 - Not done: Gmail sending (needs OAuth consent); disclosure-packet findings render once Plan B ships it.
+
+## Use it from any AI (MCP)
+
+House Checker is also an MCP server: `https://house-checker-chi.vercel.app/api/mcp` (Streamable HTTP, stateless).
+Tools: `check_home` (an address or pasted listing in, the full report as Markdown with numbered sources out, about
+20 s) and `get_report` (a saved report by id). Set `HC_MCP_TOKEN` to require `Authorization: Bearer <token>`.
+
+- **Grok (xAI Responses API)**:
+  ```bash
+  curl https://api.x.ai/v1/responses -H "Authorization: Bearer $XAI_API_KEY" -H "Content-Type: application/json" -d '{
+    "model": "grok-4.7",
+    "input": [{"role": "user", "content": "Check 2055 42nd Ave in San Francisco before I make an offer"}],
+    "tools": [{"type": "mcp", "server_url": "https://house-checker-chi.vercel.app/api/mcp", "server_label": "house_checker"}]
+  }'
+  ```
+- **Claude Code**: `claude mcp add --transport http house-checker https://house-checker-chi.vercel.app/api/mcp`
+- **Claude.ai / ChatGPT / Cursor**: add a custom connector (remote MCP server) with the same URL.
 
 ## Not advice
 
